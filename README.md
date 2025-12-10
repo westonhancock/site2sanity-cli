@@ -75,6 +75,7 @@ This is the recommended way to use s2s. It will:
 - Prompt for URL if not provided
 - Guide you through crawl configuration
 - Automatically crawl, analyze, and generate schema
+- Allow merging page types (e.g., combine singleton pages like "about" and "contact" into a single "page" type)
 - Let you customize document type names
 - Export ready-to-use TypeScript files
 
@@ -175,6 +176,36 @@ s2s doctor [options]
 
 Options:
   -d, --dir <directory>       Workspace directory (default: .site2sanity)
+```
+
+### `project`
+
+Open and edit an existing workspace. Allows re-analyzing, viewing page types, or exporting without re-crawling.
+
+```bash
+s2s project [options]
+
+Options:
+  -d, --dir <directory>       Workspace directory (default: .site2sanity)
+```
+
+This command lets you:
+- Re-analyze crawled data with different settings
+- View detected page types
+- Regenerate and export schema
+- View project configuration
+
+### `cleanup`
+
+Remove workspace and export directories to start fresh.
+
+```bash
+s2s cleanup [options]
+
+Options:
+  -d, --dir <directory>       Workspace directory to remove (default: .site2sanity)
+  -o, --out <directory>       Output directory to remove (default: out)
+  -y, --yes                   Skip confirmation prompt
 ```
 
 ## Configuration

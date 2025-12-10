@@ -15,6 +15,8 @@ import { lintCommand } from './commands/lint';
 import { exportCommand } from './commands/export';
 import { reportCommand } from './commands/report';
 import { doctorCommand } from './commands/doctor';
+import { cleanupCommand } from './commands/cleanup';
+import { projectCommand } from './commands/project';
 
 const program = new Command();
 
@@ -35,6 +37,10 @@ program.addCommand(lintCommand);
 program.addCommand(exportCommand);
 program.addCommand(reportCommand);
 program.addCommand(doctorCommand);
+
+// Workspace management
+program.addCommand(projectCommand);
+program.addCommand(cleanupCommand);
 
 // Parse arguments
 program.parse(process.argv);

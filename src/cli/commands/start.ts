@@ -165,7 +165,7 @@ export const startCommand = new Command('start')
         process.exit(0);
       }
 
-      // Interactive mapping
+      // Interactive mapping with merging support
       const model: SanityModel = {
         documents: [],
         objects: [],
@@ -174,7 +174,101 @@ export const startCommand = new Command('start')
       };
 
       console.log();
-      for (const pageType of pageTypes) {
+
+      // Ask about merging page types
+      const mergeAnswer = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'merge',
+          message: 'Would you like to merge any page types together?',
+          default: false,
+        },
+      ]);
+
+      let processedTypes = [...pageTypes];
+      const mergedTypeIds = new Set<string>();
+
+      if (mergeAnswer.merge) {
+        let continueMerging = true;
+
+        while (continueMerging) {
+          const availableTypes = processedTypes.filter(pt => !mergedTypeIds.has(pt.id));
+
+          if (availableTypes.length < 2) {
+            logger.info('Not enough page types left to merge');
+            break;
+          }
+
+          const mergeSelection = await inquirer.prompt([
+            {
+              type: 'checkbox',
+              name: 'types',
+              message: 'Select page types to merge (use space to select):',
+              choices: availableTypes.map(pt => ({
+                name: `${pt.name} (${pt.pageCount} page${pt.pageCount > 1 ? 's' : ''})`,
+                value: pt.id,
+              })),
+              validate: (input) => input.length >= 2 || 'Select at least 2 types to merge',
+            },
+            {
+              type: 'input',
+              name: 'mergedName',
+              message: 'Name for merged page type:',
+              default: 'page',
+              when: (ans) => ans.types.length >= 2,
+            },
+          ]);
+
+          if (mergeSelection.types.length >= 2) {
+            // Create merged type
+            const typesToMerge = pageTypes.filter(pt => mergeSelection.types.includes(pt.id));
+            const mergedExamples = typesToMerge.flatMap(pt => pt.examples);
+            const mergedPageCount = typesToMerge.reduce((sum, pt) => sum + pt.pageCount, 0);
+
+            const mergedType: PageType = {
+              id: `merged-${Date.now()}`,
+              name: mergeSelection.mergedName,
+              confidence: Math.max(...typesToMerge.map(pt => pt.confidence)),
+              examples: mergedExamples.slice(0, 5),
+              urlPattern: 'merged',
+              domSignature: '',
+              jsonLdTypes: [],
+              features: typesToMerge[0].features,
+              pageCount: mergedPageCount,
+              rationale: `Merged from: ${typesToMerge.map(pt => pt.name).join(', ')}`,
+            };
+
+            processedTypes.push(mergedType);
+            typesToMerge.forEach(pt => mergedTypeIds.add(pt.id));
+
+            logger.success(`Merged ${typesToMerge.length} types into "${mergeSelection.mergedName}"`);
+          }
+
+          const continueAnswer = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'continue',
+              message: 'Merge more page types?',
+              default: false,
+            },
+          ]);
+
+          continueMerging = continueAnswer.continue;
+        }
+      }
+
+      // Filter out merged types
+      const finalTypes = processedTypes.filter(pt => !mergedTypeIds.has(pt.id));
+
+      console.log();
+      logger.info('Final page types to map:');
+      finalTypes.forEach(pt => {
+        console.log(`  • ${pt.name} (${pt.pageCount} page${pt.pageCount > 1 ? 's' : ''})`);
+      });
+      console.log();
+
+      // Map each type to Sanity schema
+      for (const pageType of finalTypes) {
         const typeAnswers = await inquirer.prompt([
           {
             type: 'confirm',
