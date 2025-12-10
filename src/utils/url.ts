@@ -100,7 +100,7 @@ export function extractUrlPattern(url: string): string {
     const segments = getPathSegments(url);
 
     // Replace segments that look like IDs/slugs with placeholders
-    const pattern = segments.map(segment => {
+    const pattern = segments.map((segment, index) => {
       // Numbers
       if (/^\d+$/.test(segment)) {
         return ':id';
@@ -113,8 +113,14 @@ export function extractUrlPattern(url: string): string {
       if (/^\d{4}-\d{2}-\d{2}$/.test(segment)) {
         return ':date';
       }
+      // Slugs: lowercase alphanumeric with optional hyphens
+      // Detect as slug if it's in the last position and previous segment exists
+      // This catches "plato-systems", "sandow", "aec", "d-id" after "case-studies", "solutions", etc.
+      if (index > 0 && index === segments.length - 1 && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(segment)) {
+        return ':slug';
+      }
       // Long alphanumeric (likely slugs)
-      if (segment.length > 15 && /^[a-z0-9-]+$/.test(segment)) {
+      if (segment.length > 12 && /^[a-z0-9-]+$/.test(segment)) {
         return ':slug';
       }
       return segment;
