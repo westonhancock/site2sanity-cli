@@ -37,7 +37,7 @@ export class Crawler {
     logger.info(`Max pages: ${this.config.maxPages}, Max depth: ${this.config.maxDepth}`);
 
     if (this.config.render) {
-      this.browser = await puppeteer.launch({ headless: true });
+      this.browser = await puppeteer.launch({ headless: "new" });
       logger.info('Launched headless browser for rendered crawling');
     }
 
