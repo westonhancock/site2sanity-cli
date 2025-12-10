@@ -151,9 +151,22 @@ export const mapCommand = new Command('map')
         logger.info('Running in non-interactive mode with defaults');
 
         for (const pageType of pageTypes) {
+          // Convert name to camelCase (remove hyphens, capitalize words)
+          const camelCaseName = pageType.name
+            .split('-')
+            .map((word, index) =>
+              index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)
+            )
+            .join('');
+
+          const titleCaseName = pageType.name
+            .split('-')
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+
           model.documents.push({
-            name: pageType.name,
-            title: pageType.name.charAt(0).toUpperCase() + pageType.name.slice(1),
+            name: camelCaseName,
+            title: titleCaseName,
             type: 'document',
             mode: 'builder',
             fields: [
