@@ -18,14 +18,14 @@ export const exportCommand = new Command('export')
       const workspace = new Workspace(options.dir);
 
       if (!workspace.exists()) {
-        logger.error('Workspace not initialized. Run "site2sanity init <url>" first.');
+        logger.error('Workspace not initialized. Run "s2s init <url>" first.');
         process.exit(1);
       }
 
       const model = await workspace.loadJSON<SanityModel>('model.json');
 
       if (!model) {
-        logger.error('No model found. Run "site2sanity map" first.');
+        logger.error('No model found. Run "s2s map" first.');
         process.exit(1);
       }
 

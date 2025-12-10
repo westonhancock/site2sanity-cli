@@ -29,35 +29,35 @@ npx site2sanity-cli init https://example.com
 
 ```bash
 # 1. Initialize a new project
-site2sanity init https://example.com
+s2s init https://example.com
 
 # 2. Crawl the website
-site2sanity crawl
+s2s crawl
 
 # 3. Analyze the crawl data
-site2sanity analyze
+s2s analyze
 
 # 4. Interactively create Sanity schema
-site2sanity map
+s2s map
 
 # 5. Validate the schema
-site2sanity lint
+s2s lint
 
 # 6. Export TypeScript schema files
-site2sanity export
+s2s export
 
 # 7. View detailed report
-site2sanity report
+s2s report
 ```
 
 ## Commands
 
 ### `init <url>`
 
-Initialize a new site2sanity project.
+Initialize a new s2s project.
 
 ```bash
-site2sanity init https://example.com [options]
+s2s init https://example.com [options]
 
 Options:
   -d, --dir <directory>       Workspace directory (default: .site2sanity)
@@ -70,7 +70,7 @@ Options:
 Crawl the website and collect page data.
 
 ```bash
-site2sanity crawl [options]
+s2s crawl [options]
 
 Options:
   -d, --dir <directory>       Workspace directory (default: .site2sanity)
@@ -86,7 +86,7 @@ Options:
 Analyze crawl data to detect IA, page types, and relationships.
 
 ```bash
-site2sanity analyze [options]
+s2s analyze [options]
 
 Options:
   -d, --dir <directory>       Workspace directory (default: .site2sanity)
@@ -97,7 +97,7 @@ Options:
 Interactively map page types to Sanity schema.
 
 ```bash
-site2sanity map [options]
+s2s map [options]
 
 Options:
   -d, --dir <directory>       Workspace directory (default: .site2sanity)
@@ -109,7 +109,7 @@ Options:
 Validate Sanity schema for correctness and best practices.
 
 ```bash
-site2sanity lint [options]
+s2s lint [options]
 
 Options:
   -d, --dir <directory>       Workspace directory (default: .site2sanity)
@@ -120,7 +120,7 @@ Options:
 Export Sanity schema and migration artifacts.
 
 ```bash
-site2sanity export [options]
+s2s export [options]
 
 Options:
   -d, --dir <directory>       Workspace directory (default: .site2sanity)
@@ -132,7 +132,7 @@ Options:
 Generate a comprehensive analysis report.
 
 ```bash
-site2sanity report [options]
+s2s report [options]
 
 Options:
   -d, --dir <directory>       Workspace directory (default: .site2sanity)
@@ -145,7 +145,7 @@ Options:
 Diagnose workspace and environment issues.
 
 ```bash
-site2sanity doctor [options]
+s2s doctor [options]
 
 Options:
   -d, --dir <directory>       Workspace directory (default: .site2sanity)

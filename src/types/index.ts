@@ -192,6 +192,7 @@ export interface SanityDocumentType {
   fieldsets?: SanityFieldset[];
   icon?: string;
   description?: string;
+  singleton?: boolean;
   __source?: {
     pageType: string;
     confidence: number;

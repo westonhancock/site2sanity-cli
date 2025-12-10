@@ -20,7 +20,7 @@ export const reportCommand = new Command('report')
       const workspace = new Workspace(options.dir);
 
       if (!workspace.exists()) {
-        logger.error('Workspace not initialized. Run "site2sanity init <url>" first.');
+        logger.error('Workspace not initialized. Run "s2s init <url>" first.');
         process.exit(1);
       }
 

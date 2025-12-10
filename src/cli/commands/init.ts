@@ -8,7 +8,7 @@ import { Workspace } from '../../utils/workspace';
 import { logger } from '../../utils/logger';
 
 export const initCommand = new Command('init')
-  .description('Initialize a new site2sanity project')
+  .description('Initialize a new s2s project')
   .argument('<url>', 'Base URL of the site to analyze')
   .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
   .option('--max-pages <number>', 'Maximum pages to crawl', '1000')
@@ -58,10 +58,10 @@ export const initCommand = new Command('init')
       logger.success('Project initialized successfully!');
       console.log();
       logger.info('Next steps:');
-      console.log('  1. Run "site2sanity crawl" to start crawling the site');
-      console.log('  2. Run "site2sanity analyze" to analyze the crawl data');
-      console.log('  3. Run "site2sanity map" to create Sanity schema interactively');
-      console.log('  4. Run "site2sanity export" to generate Sanity artifacts');
+      console.log('  1. Run "s2s crawl" to start crawling the site');
+      console.log('  2. Run "s2s analyze" to analyze the crawl data');
+      console.log('  3. Run "s2s map" to create Sanity schema interactively');
+      console.log('  4. Run "s2s export" to generate Sanity artifacts');
       console.log();
       logger.info('Configuration saved to: ' + options.dir + '/config.json');
 

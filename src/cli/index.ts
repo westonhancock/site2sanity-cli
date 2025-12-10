@@ -18,7 +18,7 @@ import { doctorCommand } from './commands/doctor';
 const program = new Command();
 
 program
-  .name('site2sanity')
+  .name('s2s')
   .description('An interactive CLI that crawls websites and generates Sanity CMS schema')
   .version('0.1.0');
 

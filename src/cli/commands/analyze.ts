@@ -16,7 +16,7 @@ export const analyzeCommand = new Command('analyze')
       const workspace = new Workspace(options.dir);
 
       if (!workspace.exists()) {
-        logger.error('Workspace not initialized. Run "site2sanity init <url>" first.');
+        logger.error('Workspace not initialized. Run "s2s init <url>" first.');
         process.exit(1);
       }
 
@@ -26,7 +26,7 @@ export const analyzeCommand = new Command('analyze')
       const pages = db.getAllPages();
 
       if (pages.length === 0) {
-        logger.error('No pages found. Run "site2sanity crawl" first.');
+        logger.error('No pages found. Run "s2s crawl" first.');
         process.exit(1);
       }
 
@@ -80,8 +80,8 @@ export const analyzeCommand = new Command('analyze')
       logger.success('Analysis completed!');
       console.log();
       logger.info('Next steps:');
-      console.log('  1. Run "site2sanity report" to view detailed report');
-      console.log('  2. Run "site2sanity map" to create Sanity schema interactively');
+      console.log('  1. Run "s2s report" to view detailed report');
+      console.log('  2. Run "s2s map" to create Sanity schema interactively');
 
       db.close();
     } catch (error) {

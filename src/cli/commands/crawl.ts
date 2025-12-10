@@ -21,7 +21,7 @@ export const crawlCommand = new Command('crawl')
       const workspace = new Workspace(options.dir);
 
       if (!workspace.exists()) {
-        logger.error('Workspace not initialized. Run "site2sanity init <url>" first.');
+        logger.error('Workspace not initialized. Run "s2s init <url>" first.');
         process.exit(1);
       }
 
@@ -82,8 +82,8 @@ export const crawlCommand = new Command('crawl')
       logger.success('Crawl completed!');
       console.log();
       logger.info('Next steps:');
-      console.log('  1. Run "site2sanity analyze" to analyze the crawl data');
-      console.log('  2. Run "site2sanity report" to view crawl statistics');
+      console.log('  1. Run "s2s analyze" to analyze the crawl data');
+      console.log('  2. Run "s2s report" to view crawl statistics');
 
       db.close();
     } catch (error) {

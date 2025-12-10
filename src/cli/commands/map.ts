@@ -17,14 +17,14 @@ export const mapCommand = new Command('map')
       const workspace = new Workspace(options.dir);
 
       if (!workspace.exists()) {
-        logger.error('Workspace not initialized. Run "site2sanity init <url>" first.');
+        logger.error('Workspace not initialized. Run "s2s init <url>" first.');
         process.exit(1);
       }
 
       const pageTypes = await workspace.loadJSON<PageType[]>('pageTypes.json');
 
       if (!pageTypes || pageTypes.length === 0) {
-        logger.error('No page types found. Run "site2sanity analyze" first.');
+        logger.error('No page types found. Run "s2s analyze" first.');
         process.exit(1);
       }
 
@@ -189,8 +189,8 @@ export const mapCommand = new Command('map')
       logger.success(`Created schema with ${model.documents.length} document types`);
       console.log();
       logger.info('Next steps:');
-      console.log('  1. Run "site2sanity lint" to validate the schema');
-      console.log('  2. Run "site2sanity export" to generate TypeScript files');
+      console.log('  1. Run "s2s lint" to validate the schema');
+      console.log('  2. Run "s2s export" to generate TypeScript files');
     } catch (error) {
       logger.error(`Mapping failed: ${(error as Error).message}`);
       if (process.env.DEBUG) {
