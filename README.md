@@ -27,30 +27,56 @@ npx site2sanity-cli init https://example.com
 
 ## Quick Start
 
+The easiest way to use s2s is with the interactive workflow:
+
 ```bash
-# 1. Initialize a new project
-s2s init https://example.com
+# Start the interactive workflow (analyzes site and generates schema)
+s2s https://example.com
 
-# 2. Crawl the website
-s2s crawl
+# Or just run s2s and it will prompt you for the URL
+s2s
+```
 
-# 3. Analyze the crawl data
-s2s analyze
+That's it! The CLI will guide you through:
+1. Configuring the crawl (pages, depth, rendering)
+2. Crawling and analyzing the site
+3. Creating Sanity schema from detected page types
+4. Exporting TypeScript schema files
 
-# 4. Interactively create Sanity schema
-s2s map
+### Advanced: Individual Commands
 
-# 5. Validate the schema
-s2s lint
+For more control, you can run each step separately:
 
-# 6. Export TypeScript schema files
-s2s export
-
-# 7. View detailed report
-s2s report
+```bash
+s2s init https://example.com    # Initialize project
+s2s crawl                        # Crawl the website
+s2s analyze                      # Analyze structure
+s2s map                          # Create schema
+s2s export                       # Export files
+s2s report                       # View report
 ```
 
 ## Commands
+
+### `start [url]` (Default)
+
+Interactive workflow that guides you through the entire process.
+
+```bash
+s2s [url] [options]
+# or
+s2s start [url] [options]
+
+Options:
+  -d, --dir <directory>       Workspace directory (default: .site2sanity)
+```
+
+This is the recommended way to use s2s. It will:
+- Prompt for URL if not provided
+- Guide you through crawl configuration
+- Automatically crawl, analyze, and generate schema
+- Let you customize document type names
+- Export ready-to-use TypeScript files
 
 ### `init <url>`
 

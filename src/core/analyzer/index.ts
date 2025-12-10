@@ -46,7 +46,7 @@ export class Analyzer {
   /**
    * Detect page types through clustering
    */
-  detectPageTypes(threshold: number = 0.7, maxClusters: number = 20): PageType[] {
+  detectPageTypes(threshold: number = 0.7, maxClusters: number = 20, includeSingletons: boolean = true): PageType[] {
     // Group pages by URL pattern
     const patternGroups = new Map<string, Page[]>();
 
@@ -62,7 +62,8 @@ export class Analyzer {
     const pageTypes: PageType[] = [];
 
     for (const [pattern, pages] of patternGroups.entries()) {
-      if (pages.length < 2) continue; // Skip single pages
+      // Include single pages if enabled (home, about, contact, etc.)
+      if (pages.length < 2 && !includeSingletons) continue;
 
       const features = this.analyzePageFeatures(pages);
       const jsonLdTypes = this.extractJsonLdTypes(pages);

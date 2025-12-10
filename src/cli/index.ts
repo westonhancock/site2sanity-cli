@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import { startCommand } from './commands/start';
 import { initCommand } from './commands/init';
 import { crawlCommand } from './commands/crawl';
 import { analyzeCommand } from './commands/analyze';
@@ -22,7 +23,10 @@ program
   .description('An interactive CLI that crawls websites and generates Sanity CMS schema')
   .version('0.1.0');
 
-// Commands
+// Primary interactive command
+program.addCommand(startCommand, { isDefault: true });
+
+// Individual commands (for advanced users)
 program.addCommand(initCommand);
 program.addCommand(crawlCommand);
 program.addCommand(analyzeCommand);
