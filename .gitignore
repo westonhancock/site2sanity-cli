@@ -3,3 +3,19 @@ dist/
 .env
 .DS_Store
 *.log
+
+# Test workspace
+.site2sanity/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+
+# Build artifacts
+*.tsbuildinfo
