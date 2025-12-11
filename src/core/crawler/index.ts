@@ -36,41 +36,46 @@ export class Crawler {
     logger.info(`Starting crawl of ${this.baseUrl}`);
     logger.info(`Max pages: ${this.config.maxPages}, Max depth: ${this.config.maxDepth}`);
 
-    if (this.config.render) {
-      this.browser = await puppeteer.launch({ headless: "new" });
-      logger.info('Launched headless browser for rendered crawling');
-    }
+    try {
+      if (this.config.render) {
+        this.browser = await puppeteer.launch({ headless: "new" });
+        logger.info('Launched headless browser for rendered crawling');
+      }
 
-    // Add base URL to queue
-    this.toVisit.push({ url: this.baseUrl, depth: 0 });
+      // Add base URL to queue
+      this.toVisit.push({ url: this.baseUrl, depth: 0 });
 
-    let crawled = 0;
-    const startTime = Date.now();
+      let crawled = 0;
+      const startTime = Date.now();
 
-    while (this.toVisit.length > 0 && crawled < this.config.maxPages) {
-      const batch = this.toVisit.splice(0, this.config.concurrency);
+      while (this.toVisit.length > 0 && crawled < this.config.maxPages) {
+        const batch = this.toVisit.splice(0, this.config.concurrency);
 
-      await Promise.all(
-        batch.map(({ url, depth }) =>
-          this.queue.add(() => this.crawlPage(url, depth))
-        )
-      );
+        await Promise.allSettled(
+          batch.map(({ url, depth }) =>
+            this.queue.add(() => this.crawlPage(url, depth))
+          )
+        );
 
-      crawled = this.visited.size;
-      logger.updateSpinner(`Crawled ${crawled} pages (${this.toVisit.length} in queue)`);
+        crawled = this.visited.size;
+        logger.updateSpinner(`Crawled ${crawled} pages (${this.toVisit.length} in queue)`);
 
-      // Throttle
-      if (this.config.throttle > 0) {
-        await new Promise(resolve => setTimeout(resolve, this.config.throttle));
+        // Throttle
+        if (this.config.throttle > 0) {
+          await new Promise(resolve => setTimeout(resolve, this.config.throttle));
+        }
+      }
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+      logger.succeedSpinner(`Crawled ${crawled} pages in ${duration}s`);
+    } catch (error) {
+      logger.failSpinner(`Crawl failed: ${(error as Error).message}`);
+      throw error;
+    } finally {
+      if (this.browser) {
+        await this.browser.close();
       }
     }
-
-    if (this.browser) {
-      await this.browser.close();
-    }
-
-    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    logger.succeedSpinner(`Crawled ${crawled} pages in ${duration}s`);
   }
 
   /**
@@ -91,47 +96,103 @@ export class Crawler {
 
     this.visited.add(normalizedUrl);
 
-    try {
-      const page: Page = this.config.render
-        ? await this.crawlRendered(normalizedUrl)
-        : await this.crawlHTML(normalizedUrl);
+    // Retry logic for transient errors
+    let lastError: Error | null = null;
+    const maxRetries = 3;
 
-      // Save to database
-      this.db.savePage(page);
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const page: Page = this.config.render
+          ? await this.crawlRendered(normalizedUrl)
+          : await this.crawlHTML(normalizedUrl);
 
-      // Extract and queue links
-      if (depth < this.config.maxDepth) {
-        const newLinks = page.links
-          .filter(link => isSameOrigin(link.href, this.baseUrl))
-          .filter(link => !this.visited.has(normalizeUrl(link.href)))
-          .filter(link => !this.shouldExclude(normalizeUrl(link.href)));
+        // Save to database
+        this.db.savePage(page);
 
-        for (const link of newLinks) {
-          const normalizedLink = normalizeUrl(link.href);
-          if (!this.toVisit.some(item => item.url === normalizedLink)) {
-            this.toVisit.push({ url: normalizedLink, depth: depth + 1 });
+        // Extract and queue links
+        if (depth < this.config.maxDepth) {
+          const newLinks = page.links
+            .filter(link => isSameOrigin(link.href, this.baseUrl))
+            .filter(link => !this.visited.has(normalizeUrl(link.href)))
+            .filter(link => !this.shouldExclude(normalizeUrl(link.href)));
+
+          for (const link of newLinks) {
+            const normalizedLink = normalizeUrl(link.href);
+            if (!this.toVisit.some(item => item.url === normalizedLink)) {
+              this.toVisit.push({ url: normalizedLink, depth: depth + 1 });
+            }
           }
         }
+
+        // Success - break out of retry loop
+        return;
+      } catch (error) {
+        lastError = error as Error;
+        const isRetryable = this.isRetryableError(error as Error);
+
+        if (isRetryable && attempt < maxRetries) {
+          const backoff = attempt * 1000; // Exponential backoff: 1s, 2s, 3s
+          logger.debug(`Retry ${attempt}/${maxRetries} for ${normalizedUrl} after ${backoff}ms`);
+          await new Promise(resolve => setTimeout(resolve, backoff));
+        } else {
+          break;
+        }
       }
-    } catch (error) {
-      logger.debug(`Error crawling ${normalizedUrl}: ${(error as Error).message}`);
     }
+
+    if (lastError) {
+      logger.debug(`Failed to crawl ${normalizedUrl} after ${maxRetries} attempts: ${lastError.message}`);
+    }
+  }
+
+  /**
+   * Check if error is retryable
+   */
+  private isRetryableError(error: Error): boolean {
+    const retryableMessages = [
+      'socket hang up',
+      'ECONNRESET',
+      'ETIMEDOUT',
+      'ENOTFOUND',
+      'EAI_AGAIN',
+      'Network request failed',
+      'AbortError',
+    ];
+
+    return retryableMessages.some(msg =>
+      error.message.toLowerCase().includes(msg.toLowerCase())
+    );
   }
 
   /**
    * Crawl using HTML fetch
    */
   private async crawlHTML(url: string): Promise<Page> {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': this.config.userAgent || 'site2sanity-bot/1.0',
-      },
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
-    const html = await response.text();
-    const $ = cheerio.load(html);
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': this.config.userAgent || 'Mozilla/5.0 (compatible; site2sanity-bot/1.0)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate',
+          'Connection': 'keep-alive',
+        },
+        signal: controller.signal as any,
+      });
 
-    return this.extractPageData(url, $, response.status);
+      clearTimeout(timeout);
+
+      const html = await response.text();
+      const $ = cheerio.load(html);
+
+      return this.extractPageData(url, $, response.status);
+    } catch (error) {
+      clearTimeout(timeout);
+      throw error;
+    }
   }
 
   /**
