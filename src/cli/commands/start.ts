@@ -9,6 +9,7 @@ import { Workspace } from '../../utils/workspace';
 import { CrawlDatabase } from '../../utils/database';
 import { Crawler } from '../../core/crawler';
 import { Analyzer } from '../../core/analyzer';
+import { AIAnalyzer, AIAnalysisResult } from '../../core/analyzer/aiAnalyzer';
 import { SanityExporter } from '../../core/exporter/sanity';
 import { logger } from '../../utils/logger';
 import { SanityModel, PageType } from '../../types';
@@ -141,9 +142,76 @@ export const startCommand = new Command('start')
       logger.succeedSpinner(`Found ${relationships.length} relationships`);
 
       logger.startSpinner('Detecting content objects...');
-      const detectedObjects = analyzer.detectObjects();
+      let detectedObjects = analyzer.detectObjects();
       await workspace.saveJSON('objects.json', detectedObjects);
       logger.succeedSpinner(`Found ${detectedObjects.length} reusable object types`);
+
+      // AI-powered analysis (optional)
+      let aiAnalysis: AIAnalysisResult | null = null;
+      console.log();
+      const useAI = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'enabled',
+          message: '🤖 Use AI to enhance analysis and detect blocks? (requires Anthropic API key)',
+          default: true,
+        },
+      ]);
+
+      if (useAI.enabled) {
+        const apiKeyPrompt = await inquirer.prompt([
+          {
+            type: 'password',
+            name: 'apiKey',
+            message: 'Enter your Anthropic API key (sk-ant-...):',
+            validate: (input) => input.startsWith('sk-ant-') || 'API key must start with sk-ant-',
+          },
+        ]);
+
+        try {
+          logger.startSpinner('Running AI analysis (this may take 10-30 seconds)...');
+
+          const aiAnalyzer = new AIAnalyzer({
+            enabled: true,
+            provider: 'anthropic',
+            model: 'claude-3-5-sonnet-20241022',
+            apiKey: apiKeyPrompt.apiKey,
+            maxPagesPerAnalysis: 20,
+          });
+
+          aiAnalysis = await aiAnalyzer.analyzeSite(pages, pageTypes);
+          await workspace.saveJSON('aiAnalysis.json', aiAnalysis);
+
+          logger.succeedSpinner(
+            `AI found ${aiAnalysis.detectedBlocks.length} blocks, enhanced ${aiAnalysis.enhancedObjects.length} objects`
+          );
+
+          // Merge AI-enhanced objects with detected objects
+          if (aiAnalysis.enhancedObjects.length > 0) {
+            detectedObjects = [
+              ...detectedObjects,
+              ...aiAnalysis.enhancedObjects.map(obj => ({
+                id: `ai-${obj.name}`,
+                type: obj.type,
+                name: obj.name,
+                instances: [], // AI doesn't provide instances
+                confidence: 0.9,
+                suggestedFields: obj.suggestedFields.map(f => ({
+                  name: f.name,
+                  type: f.type,
+                  required: f.required,
+                  examples: [],
+                })),
+                pageTypeRefs: [],
+                rationale: obj.description,
+              })),
+            ];
+          }
+        } catch (error) {
+          logger.failSpinner(`AI analysis failed: ${(error as Error).message}`);
+          logger.info('Continuing with basic analysis...');
+        }
+      }
 
       // Show results
       console.log();
@@ -156,7 +224,18 @@ export const startCommand = new Command('start')
         console.log();
         logger.info('Reusable Objects Found:');
         detectedObjects.forEach(obj => {
-          console.log(`  • ${obj.type}: ${obj.name} (${obj.instances.length} instance${obj.instances.length > 1 ? 's' : ''})`);
+          const source = obj.id.startsWith('ai-') ? '🤖 AI' : 'Pattern';
+          const instanceCount = obj.instances.length > 0 ? `${obj.instances.length} instance${obj.instances.length > 1 ? 's' : ''}` : 'suggested';
+          console.log(`  • ${obj.type}: ${obj.name} (${instanceCount}) [${source}]`);
+        });
+      }
+
+      if (aiAnalysis && aiAnalysis.detectedBlocks.length > 0) {
+        console.log();
+        logger.info('🤖 AI-Detected Blocks:');
+        aiAnalysis.detectedBlocks.forEach(block => {
+          console.log(`  • ${block.name} (${block.occurrences} occurrence${block.occurrences > 1 ? 's' : ''})`);
+          console.log(`    ${block.description}`);
         });
       }
 
@@ -416,6 +495,61 @@ export const startCommand = new Command('start')
                 type: 'object',
                 fields: sanityFields,
                 description: obj.rationale,
+              });
+            }
+          }
+        }
+      }
+
+      // Add AI-detected blocks
+      if (aiAnalysis && aiAnalysis.detectedBlocks.length > 0) {
+        console.log();
+        const includeBlocksAnswer = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'include',
+            message: `🤖 Create Sanity block types from AI-detected patterns?`,
+            default: true,
+          },
+        ]);
+
+        if (includeBlocksAnswer.include) {
+          for (const block of aiAnalysis.detectedBlocks) {
+            const blockTypeAnswer = await inquirer.prompt([
+              {
+                type: 'confirm',
+                name: 'include',
+                message: `Include "${block.name}" block (${block.occurrences} occurrence${block.occurrences > 1 ? 's' : ''})?`,
+                default: block.occurrences > 2,
+              },
+            ]);
+
+            if (blockTypeAnswer.include) {
+              const camelCaseName = block.name
+                .split(/[\s-]/)
+                .map((word, index) =>
+                  index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1)
+                )
+                .join('');
+
+              const titleCaseName = block.name
+                .split(/[\s-]/)
+                .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                .join(' ');
+
+              const sanityFields = block.fields.map(field => ({
+                name: field.name,
+                title: field.name.charAt(0).toUpperCase() + field.name.slice(1),
+                type: mapToSanityType(field.type),
+                description: field.description,
+              }));
+
+              model.blocks.push({
+                name: camelCaseName,
+                title: titleCaseName,
+                type: 'object',
+                fields: sanityFields,
+                description: block.description,
               });
             }
           }

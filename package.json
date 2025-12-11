@@ -24,6 +24,7 @@
   "author": "Weston Hancock <weston.e.hancock@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
     "better-sqlite3": "^9.2.2",
     "chalk": "^4.1.2",
     "cheerio": "^1.0.0-rc.12",

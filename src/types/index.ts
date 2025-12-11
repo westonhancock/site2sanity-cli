@@ -46,11 +46,11 @@ export interface ExportConfig {
 }
 
 export interface AIConfig {
-  mode: 'off' | 'label' | 'full';
-  provider: 'openai' | 'anthropic';
+  enabled: boolean;
+  provider: 'anthropic' | 'openai';
   model: string;
-  samplesPerCluster: number;
   apiKey?: string;
+  maxPagesPerAnalysis: number; // Limit pages sent to AI to control costs
 }
 
 // Crawl data structures

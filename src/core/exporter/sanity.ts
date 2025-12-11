@@ -50,6 +50,15 @@ export class SanityExporter {
       );
     }
 
+    // Export blocks
+    for (const block of model.blocks) {
+      const content = this.generateObjectType(block); // Blocks use same format as objects
+      fs.writeFileSync(
+        path.join(blockDir, `${block.name}.ts`),
+        content
+      );
+    }
+
     // Export index file
     const indexContent = this.generateIndexFile(model);
     fs.writeFileSync(path.join(schemaDir, 'index.ts'), indexContent);
@@ -217,6 +226,12 @@ export default defineType({
     for (const obj of model.objects) {
       imports.push(`import ${obj.name} from './objects/${obj.name}'`);
       exports.push(obj.name);
+    }
+
+    // Blocks
+    for (const block of model.blocks) {
+      imports.push(`import ${block.name} from './blocks/${block.name}'`);
+      exports.push(block.name);
     }
 
     // Common objects
