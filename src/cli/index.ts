@@ -17,6 +17,7 @@ import { reportCommand } from './commands/report';
 import { doctorCommand } from './commands/doctor';
 import { cleanupCommand } from './commands/cleanup';
 import { projectCommand } from './commands/project';
+import { configCommand } from './commands/config';
 
 const program = new Command();
 
@@ -41,6 +42,9 @@ program.addCommand(doctorCommand);
 // Workspace management
 program.addCommand(projectCommand);
 program.addCommand(cleanupCommand);
+
+// Configuration
+program.addCommand(configCommand);
 
 // Parse arguments
 program.parse(process.argv);

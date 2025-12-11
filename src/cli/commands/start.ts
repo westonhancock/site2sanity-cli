@@ -12,13 +12,16 @@ import { Analyzer } from '../../core/analyzer';
 import { AIAnalyzer, AIAnalysisResult } from '../../core/analyzer/aiAnalyzer';
 import { SanityExporter } from '../../core/exporter/sanity';
 import { logger } from '../../utils/logger';
+import { SecretsManager } from '../../utils/secrets';
 import { SanityModel, PageType } from '../../types';
 import * as path from 'path';
+import chalk from 'chalk';
 
 export const startCommand = new Command('start')
-  .description('Start interactive site analysis and Sanity schema generation')
+  .description('Start interactive site analysis and Sanity schema generation (supports AI-powered analysis)')
   .argument('[url]', 'Base URL of the site to analyze (optional - will prompt if not provided)')
   .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
+  .option('--no-ai', 'Skip AI-powered analysis')
   .action(async (url: string | undefined, options: any) => {
     try {
       logger.section('Welcome to site2sanity!');
@@ -159,14 +162,44 @@ export const startCommand = new Command('start')
       ]);
 
       if (useAI.enabled) {
-        const apiKeyPrompt = await inquirer.prompt([
-          {
-            type: 'password',
-            name: 'apiKey',
-            message: 'Enter your Anthropic API key (sk-ant-...):',
-            validate: (input) => input.startsWith('sk-ant-') || 'API key must start with sk-ant-',
-          },
-        ]);
+        // Check for stored API key
+        let apiKey: string | null = SecretsManager.getApiKey('anthropic');
+
+        if (apiKey) {
+          const keyPreview = `${apiKey.substring(0, 7)}...${apiKey.substring(apiKey.length - 4)}`;
+          console.log(chalk.dim(`  Using stored API key: ${keyPreview}`));
+        } else {
+          // Prompt for API key
+          const apiKeyPrompt = await inquirer.prompt([
+            {
+              type: 'password',
+              name: 'apiKey',
+              message: 'Enter your Anthropic API key (sk-ant-...):',
+              validate: (input) => input.startsWith('sk-ant-') || 'API key must start with sk-ant-',
+            },
+          ]);
+          apiKey = apiKeyPrompt.apiKey;
+
+          // Ask if they want to store it
+          const storeKey = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'store',
+              message: 'Store this API key for future use? (stored in ~/.site2sanity/secrets.json)',
+              default: true,
+            },
+          ]);
+
+          if (storeKey.store && apiKey) {
+            SecretsManager.setApiKey('anthropic', apiKey);
+            console.log(chalk.dim('  API key stored securely'));
+          }
+        }
+
+        if (!apiKey) {
+          logger.error('No API key provided');
+          return;
+        }
 
         try {
           logger.startSpinner('Running AI analysis (this may take 10-30 seconds)...');
@@ -175,7 +208,7 @@ export const startCommand = new Command('start')
             enabled: true,
             provider: 'anthropic',
             model: 'claude-3-5-sonnet-20241022',
-            apiKey: apiKeyPrompt.apiKey,
+            apiKey: apiKey,
             maxPagesPerAnalysis: 20,
           });
 

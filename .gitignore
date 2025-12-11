@@ -4,6 +4,9 @@ dist/
 .DS_Store
 *.log
 
+# Secrets (stored in ~/.site2sanity/secrets.json, but ignore if accidentally placed in project)
+secrets.json
+
 # Test workspace
 .site2sanity/
 out/

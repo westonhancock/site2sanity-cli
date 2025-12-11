@@ -232,6 +232,30 @@ Options:
   -y, --yes                   Skip confirmation prompt
 ```
 
+### `config`
+
+Manage API keys and configuration. Store your Anthropic or OpenAI API keys securely for AI-powered analysis.
+
+```bash
+s2s config
+```
+
+This interactive command lets you:
+- **Set API key**: Store your Anthropic (Claude) or OpenAI (GPT) API key
+- **View stored API keys**: See which keys are configured (masked for security)
+- **Delete API key**: Remove a stored API key
+- **Clear all secrets**: Remove all stored API keys
+
+API keys are stored securely in `~/.site2sanity/secrets.json` with restricted file permissions (600). You can also use environment variables:
+- `ANTHROPIC_API_KEY` - For Claude AI analysis
+- `OPENAI_API_KEY` - For GPT analysis (future support)
+
+When you run AI analysis, the tool will:
+1. Check for environment variables first
+2. Check for stored API keys
+3. Prompt you to enter a key if none is found
+4. Offer to save the key for future use
+
 ## Configuration
 
 The `config.json` file in your workspace directory controls crawling and analysis behavior:
