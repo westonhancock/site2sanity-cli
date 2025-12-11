@@ -2,9 +2,10 @@
  * Analyzer engine - derives IA, page types, and relationships
  */
 
-import { Page, NavigationStructure, PageType, Relationship, NavItem, BreadcrumbPattern, SiteGraph, GraphNode, GraphEdge, PageFeatures } from '../../types';
+import { Page, NavigationStructure, PageType, Relationship, NavItem, BreadcrumbPattern, SiteGraph, GraphNode, GraphEdge, PageFeatures, DetectedObject } from '../../types';
 import { extractUrlPattern, getPathSegments, normalizeUrl } from '../../utils/url';
 import levenshtein from 'fast-levenshtein';
+import { ObjectDetector } from './objectDetector';
 
 export class Analyzer {
   private pages: Page[];
@@ -130,6 +131,14 @@ export class Analyzer {
     }
 
     return relationships;
+  }
+
+  /**
+   * Detect reusable content objects (authors, categories, tags, etc.)
+   */
+  detectObjects(): DetectedObject[] {
+    const detector = new ObjectDetector(this.pages);
+    return detector.detectObjects();
   }
 
   /**

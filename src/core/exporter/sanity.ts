@@ -41,6 +41,15 @@ export class SanityExporter {
     // Export common objects
     this.exportCommonObjects(objDir);
 
+    // Export detected objects
+    for (const obj of model.objects) {
+      const content = this.generateObjectType(obj);
+      fs.writeFileSync(
+        path.join(objDir, `${obj.name}.ts`),
+        content
+      );
+    }
+
     // Export index file
     const indexContent = this.generateIndexFile(model);
     fs.writeFileSync(path.join(schemaDir, 'index.ts'), indexContent);
@@ -97,6 +106,26 @@ ${indent}})`;
   preview: {
     select: ${JSON.stringify(preview.select, null, 4).split('\n').join('\n    ')}
   }`;
+  }
+
+  /**
+   * Generate object type TypeScript
+   */
+  private generateObjectType(obj: any): string {
+    const fields = this.generateFields(obj.fields);
+    const description = obj.description ? `\n  description: '${obj.description}',` : '';
+
+    return `import { defineType, defineField } from 'sanity'
+
+export default defineType({
+  name: '${obj.name}',
+  title: '${obj.title}',
+  type: 'object',${description}
+  fields: [
+${fields}
+  ]
+})
+`;
   }
 
   /**
@@ -182,6 +211,12 @@ export default defineType({
     for (const doc of [...model.documents, ...model.singletons]) {
       imports.push(`import ${doc.name} from './documents/${doc.name}'`);
       exports.push(doc.name);
+    }
+
+    // Detected objects
+    for (const obj of model.objects) {
+      imports.push(`import ${obj.name} from './objects/${obj.name}'`);
+      exports.push(obj.name);
     }
 
     // Common objects

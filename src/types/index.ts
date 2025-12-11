@@ -174,6 +174,38 @@ export interface RelationshipEvidence {
   context: string;
 }
 
+// Content object detection
+export interface DetectedObject {
+  id: string;
+  type: 'author' | 'category' | 'tag' | 'location' | 'event' | 'product' | 'custom';
+  name: string;
+  instances: ContentObjectInstance[];
+  confidence: number;
+  suggestedFields: ObjectField[];
+  pageTypeRefs: string[]; // Which page types reference this object
+  rationale: string;
+}
+
+export interface ContentObjectInstance {
+  pageUrl: string;
+  data: Record<string, any>;
+  source: 'jsonld' | 'meta' | 'content' | 'structured';
+}
+
+export interface ObjectField {
+  name: string;
+  type: string;
+  required: boolean;
+  examples: any[];
+}
+
+export interface StructuredDataPattern {
+  type: string;
+  fieldPattern: Record<string, string>;
+  occurrences: number;
+  examples: any[];
+}
+
 // Sanity model structures
 export interface SanityModel {
   documents: SanityDocumentType[];

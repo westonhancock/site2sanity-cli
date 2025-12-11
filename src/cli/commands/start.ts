@@ -140,12 +140,25 @@ export const startCommand = new Command('start')
       await workspace.saveJSON('relationships.json', relationships);
       logger.succeedSpinner(`Found ${relationships.length} relationships`);
 
+      logger.startSpinner('Detecting content objects...');
+      const detectedObjects = analyzer.detectObjects();
+      await workspace.saveJSON('objects.json', detectedObjects);
+      logger.succeedSpinner(`Found ${detectedObjects.length} reusable object types`);
+
       // Show results
       console.log();
       logger.info('Page Types Found:');
       pageTypes.forEach(pt => {
         console.log(`  • ${pt.name} (${pt.pageCount} page${pt.pageCount > 1 ? 's' : ''})`);
       });
+
+      if (detectedObjects.length > 0) {
+        console.log();
+        logger.info('Reusable Objects Found:');
+        detectedObjects.forEach(obj => {
+          console.log(`  • ${obj.type}: ${obj.name} (${obj.instances.length} instance${obj.instances.length > 1 ? 's' : ''})`);
+        });
+      }
 
       // Step 5: Map to Sanity schema
       console.log();
@@ -325,6 +338,87 @@ export const startCommand = new Command('start')
               confidence: pageType.confidence,
             },
           });
+        }
+      }
+
+      // Helper function to map detected types to Sanity types
+      const mapToSanityType = (type: string): string => {
+        const typeMap: Record<string, string> = {
+          'string': 'string',
+          'number': 'number',
+          'boolean': 'boolean',
+          'datetime': 'datetime',
+          'url': 'url',
+          'array': 'array',
+          'object': 'object',
+        };
+        return typeMap[type] || 'string';
+      };
+
+      // Add object types from detected objects
+      if (detectedObjects.length > 0) {
+        console.log();
+        const includeObjectsAnswer = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'include',
+            message: `Create Sanity object types for detected reusable content (authors, categories, etc.)?`,
+            default: true,
+          },
+        ]);
+
+        if (includeObjectsAnswer.include) {
+          for (const obj of detectedObjects) {
+            const objTypeAnswer = await inquirer.prompt([
+              {
+                type: 'confirm',
+                name: 'include',
+                message: `Include ${obj.type}: "${obj.name}" (${obj.instances.length} instance${obj.instances.length > 1 ? 's' : ''})?`,
+                default: obj.instances.length > 2,
+              },
+            ]);
+
+            if (objTypeAnswer.include) {
+              // Convert object type to Sanity schema
+              const titleCaseName = obj.name
+                .split(/[\s-]/)
+                .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                .join(' ');
+
+              const camelCaseName = obj.name
+                .split(/[\s-]/)
+                .map((word, index) =>
+                  index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1)
+                )
+                .join('');
+
+              // Create Sanity fields from detected fields
+              const sanityFields = obj.suggestedFields.map(field => ({
+                name: field.name,
+                title: field.name.charAt(0).toUpperCase() + field.name.slice(1),
+                type: mapToSanityType(field.type),
+                validation: field.required ? 'required' : undefined,
+              }));
+
+              // Ensure basic fields exist
+              if (!sanityFields.find(f => f.name === 'name')) {
+                sanityFields.unshift({
+                  name: 'name',
+                  title: 'Name',
+                  type: 'string',
+                  validation: 'required',
+                });
+              }
+
+              model.objects.push({
+                name: camelCaseName,
+                title: titleCaseName,
+                type: 'object',
+                fields: sanityFields,
+                description: obj.rationale,
+              });
+            }
+          }
         }
       }
 
