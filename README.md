@@ -7,6 +7,9 @@ An interactive CLI tool that crawls websites, derives information architecture a
 - 🕷️ **Smart Crawling**: HTML and headless browser modes with robots.txt support
 - 🗺️ **IA Discovery**: Automatic navigation structure and breadcrumb detection
 - 📄 **Page Type Detection**: Intelligent clustering based on URL patterns and content structure
+- 🤖 **AI-Powered Analysis**: Optional Claude AI integration for enhanced schema generation
+- 🧩 **Block Detection**: Automatically identifies reusable UI patterns (hero sections, CTAs, testimonials, etc.)
+- 🔍 **Object Detection**: Finds reusable content objects (authors, categories, tags, locations, etc.)
 - 🔗 **Relationship Detection**: Finds index-detail, taxonomy, and other content relationships
 - 🏗️ **Sanity-Native Schema**: Generates TypeScript schema with `defineType` following best practices
 - ✅ **Schema Validation**: Built-in linting for Sanity-specific requirements
@@ -40,8 +43,19 @@ s2s
 That's it! The CLI will guide you through:
 1. Configuring the crawl (pages, depth, rendering)
 2. Crawling and analyzing the site
-3. Creating Sanity schema from detected page types
-4. Exporting TypeScript schema files
+3. (Optional) AI-powered analysis with Claude to detect blocks and enhance object detection
+4. Creating Sanity schema from detected page types
+5. Exporting TypeScript schema files
+
+### AI-Powered Analysis
+
+For best results, enable AI analysis when prompted. You'll need an [Anthropic API key](https://console.anthropic.com/) (starts with `sk-ant-`). The AI will:
+- **Detect reusable blocks**: Hero sections, CTAs, testimonials, feature grids, etc.
+- **Enhance object detection**: Find authors, categories, tags, and other reusable content
+- **Suggest better field structures**: More accurate field types and descriptions
+- **Semantic understanding**: Analyzes content meaning, not just patterns
+
+AI analysis is optional and uses Claude 3.5 Sonnet. It analyzes up to 20 representative pages to keep costs low.
 
 ### Advanced: Individual Commands
 
@@ -75,9 +89,19 @@ This is the recommended way to use s2s. It will:
 - Prompt for URL if not provided
 - Guide you through crawl configuration
 - Automatically crawl, analyze, and generate schema
+- (Optional) Run AI-powered analysis to detect blocks and enhance object detection
 - Allow merging page types (e.g., combine singleton pages like "about" and "contact" into a single "page" type)
+- Display detected objects (authors, categories, tags, etc.) and blocks (hero sections, CTAs, etc.)
 - Let you customize document type names
-- Export ready-to-use TypeScript files
+- Export ready-to-use TypeScript files with documents, objects, and blocks
+
+**AI Features:**
+When AI analysis is enabled, the tool will:
+- Analyze up to 20 representative pages from your site
+- Detect repeating UI patterns as reusable blocks
+- Enhance object detection beyond simple pattern matching
+- Suggest more accurate field types and descriptions
+- Provide better page type suggestions
 
 ### `init <url>`
 
@@ -239,9 +263,26 @@ The `config.json` file in your workspace directory controls crawling and analysi
     "outDir": "out",
     "includeStructure": true,
     "typescriptStyle": "defineType"
+  },
+  "ai": {
+    "enabled": false,
+    "provider": "anthropic",
+    "model": "claude-3-5-sonnet-20241022",
+    "maxPagesPerAnalysis": 20
   }
 }
 ```
+
+### AI Configuration
+
+The `ai` section controls AI-powered analysis:
+
+- **enabled**: Whether to use AI analysis (set interactively, or configure here)
+- **provider**: AI provider (`"anthropic"` or `"openai"`)
+- **model**: Model to use (default: `claude-3-5-sonnet-20241022`)
+- **maxPagesPerAnalysis**: Maximum pages to send for AI analysis (default: 20, controls costs)
+
+**Note**: The API key is not stored in config.json for security. You'll be prompted to enter it when AI analysis is enabled.
 
 ## Sanity Best Practices
 
@@ -249,6 +290,8 @@ site2sanity-cli follows Sanity best practices:
 
 - **Portable Text**: Rich content fields use Portable Text by default
 - **References**: Reusable entities are modeled as documents with references
+- **Objects**: Reusable content patterns (authors, categories, tags) become reference documents
+- **Blocks**: Repeating UI components (hero, CTA, testimonials) become reusable block types
 - **Singletons**: Global settings use singleton patterns
 - **Slugs**: Routable documents include slug fields
 - **Previews**: All document types have preview configurations
@@ -329,8 +372,9 @@ npm run dev
 
 ## Roadmap
 
-- [ ] AI-powered field naming and description generation
-- [ ] Component detection from DOM structure
+- [x] AI-powered field naming and description generation
+- [x] Component detection from DOM structure (blocks)
+- [x] Reusable object detection (authors, categories, tags, etc.)
 - [ ] Advanced relationship mapping (many-to-many, nested)
 - [ ] Content migration script generation
 - [ ] Structure tool scaffolding
@@ -358,6 +402,7 @@ Built with:
 - [Cheerio](https://cheerio.js.org/) - HTML parsing
 - [Puppeteer](https://pptr.dev/) - Headless browser
 - [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) - SQLite database
+- [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-typescript) - AI-powered analysis with Claude
 - [Chalk](https://github.com/chalk/chalk) - Terminal styling
 - [Ora](https://github.com/sindresorhus/ora) - Spinners
 
