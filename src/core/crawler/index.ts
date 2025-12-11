@@ -38,7 +38,17 @@ export class Crawler {
 
     try {
       if (this.config.render) {
-        this.browser = await puppeteer.launch({ headless: "new" });
+        this.browser = await puppeteer.launch({
+          headless: true,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu',
+            '--window-size=1920x1080',
+          ],
+        });
         logger.info('Launched headless browser for rendered crawling');
       }
 
@@ -205,9 +215,13 @@ export class Crawler {
 
     const page = await this.browser.newPage();
 
+    // Set timeout and user agent
+    await page.setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    await page.setDefaultNavigationTimeout(30000);
+
     try {
       const response = await page.goto(url, {
-        waitUntil: 'networkidle0',
+        waitUntil: 'domcontentloaded', // Changed from networkidle0 for better reliability
         timeout: 30000,
       });
 
