@@ -289,7 +289,38 @@ export const startCommand = new Command('start')
       console.log();
       logger.info('Page Types Found:');
       pageTypes.forEach(pt => {
-        console.log(`  • ${pt.name} (${pt.pageCount} page${pt.pageCount > 1 ? 's' : ''})`);
+        // Main line with name and count
+        console.log(`\n  ${chalk.bold(pt.name)} ${chalk.dim(`(${pt.pageCount} page${pt.pageCount > 1 ? 's' : ''})`)}${pt.confidence < 0.7 ? chalk.yellow(' ⚠ Low confidence') : ''}`);
+
+        // Example URL
+        if (pt.examples && pt.examples.length > 0) {
+          console.log(`    ${chalk.dim('Example:')} ${chalk.cyan(pt.examples[0])}`);
+        }
+
+        // URL pattern
+        if (pt.urlPattern) {
+          console.log(`    ${chalk.dim('Pattern:')} ${pt.urlPattern}`);
+        }
+
+        // Content features
+        const features: string[] = [];
+        if (pt.features.hasDate) features.push('date');
+        if (pt.features.hasAuthor) features.push('author');
+        if (pt.features.hasPrice) features.push('price');
+        if (pt.features.hasForm) features.push('form');
+        if (pt.features.hasGallery) features.push('gallery');
+        if (pt.features.hasBreadcrumbs) features.push('breadcrumbs');
+        if (pt.features.hasRelatedContent) features.push('related content');
+        if (pt.features.richContent) features.push('rich content');
+
+        if (features.length > 0) {
+          console.log(`    ${chalk.dim('Features:')} ${features.join(', ')}`);
+        }
+
+        // Rationale
+        if (pt.rationale) {
+          console.log(`    ${chalk.dim('Description:')} ${pt.rationale}`);
+        }
       });
 
       if (detectedObjects.length > 0) {
@@ -298,7 +329,28 @@ export const startCommand = new Command('start')
         detectedObjects.forEach(obj => {
           const source = obj.id.startsWith('ai-') ? '🤖 AI' : 'Pattern';
           const instanceCount = obj.instances.length > 0 ? `${obj.instances.length} instance${obj.instances.length > 1 ? 's' : ''}` : 'suggested';
-          console.log(`  • ${obj.type}: ${obj.name} (${instanceCount}) [${source}]`);
+
+          console.log(`\n  ${chalk.bold(obj.name)} ${chalk.dim(`(${obj.type})`)} ${chalk.dim(`[${source}]`)}`);
+          console.log(`    ${chalk.dim('Instances:')} ${instanceCount}`);
+
+          if (obj.rationale) {
+            console.log(`    ${chalk.dim('Description:')} ${obj.rationale}`);
+          }
+
+          if (obj.pageTypeRefs && obj.pageTypeRefs.length > 0) {
+            const refNames = obj.pageTypeRefs.map(ref => {
+              const pt = pageTypes.find(p => p.id === ref);
+              return pt ? pt.name : ref;
+            }).join(', ');
+            console.log(`    ${chalk.dim('Referenced by:')} ${refNames}`);
+          }
+
+          // Show sample fields
+          if (obj.suggestedFields && obj.suggestedFields.length > 0) {
+            const fieldNames = obj.suggestedFields.slice(0, 3).map(f => f.name).join(', ');
+            const more = obj.suggestedFields.length > 3 ? ` +${obj.suggestedFields.length - 3} more` : '';
+            console.log(`    ${chalk.dim('Fields:')} ${fieldNames}${more}`);
+          }
         });
       }
 
@@ -306,8 +358,15 @@ export const startCommand = new Command('start')
         console.log();
         logger.info('🤖 AI-Detected Blocks:');
         aiAnalysis.detectedBlocks.forEach(block => {
-          console.log(`  • ${block.name} (${block.occurrences} occurrence${block.occurrences > 1 ? 's' : ''})`);
-          console.log(`    ${block.description}`);
+          console.log(`\n  ${chalk.bold(block.name)} ${chalk.dim(`(${block.occurrences} occurrence${block.occurrences > 1 ? 's' : ''})`)}`);
+          console.log(`    ${chalk.dim('Description:')} ${block.description}`);
+
+          // Show sample fields
+          if (block.fields && block.fields.length > 0) {
+            const fieldNames = block.fields.slice(0, 4).map(f => f.name).join(', ');
+            const more = block.fields.length > 4 ? ` +${block.fields.length - 4} more` : '';
+            console.log(`    ${chalk.dim('Fields:')} ${fieldNames}${more}`);
+          }
         });
       }
 
