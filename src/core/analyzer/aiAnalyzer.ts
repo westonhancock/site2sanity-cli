@@ -119,6 +119,7 @@ export class AIAnalyzer {
       const message = await this.client.messages.create({
         model: this.config.model || 'claude-sonnet-4-5-20250929',
         max_tokens: 8000,
+        system: 'You are a helpful assistant that analyzes websites and returns JSON-formatted responses. Always respond with valid JSON only, no additional text or explanations.',
         messages: [
           {
             role: 'user',
@@ -361,7 +362,12 @@ Focus on:
 - Practical, descriptive field names
 - Accurate field descriptions
 
-Return ONLY the JSON object, no additional text.`;
+IMPORTANT:
+- Return ONLY the JSON object with no additional text before or after
+- Do NOT include explanations, commentary, or markdown formatting
+- The response should start with { and end with }
+- Ensure all JSON is valid and properly escaped
+- If you're unsure about any fields, include them anyway with best guesses`;
   }
 
   /**
@@ -369,12 +375,33 @@ Return ONLY the JSON object, no additional text.`;
    */
   private parseAIResponse(responseText: string): AIAnalysisResult {
     try {
-      // Extract JSON from code blocks if present
-      const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) ||
-                       responseText.match(/```\n([\s\S]*?)\n```/);
+      let jsonText = responseText;
 
-      const jsonText = jsonMatch ? jsonMatch[1] : responseText;
+      // Try multiple extraction patterns
+      const patterns = [
+        // Pattern 1: ```json ... ```
+        /```json\s*\n([\s\S]*?)\n```/,
+        // Pattern 2: ``` ... ```
+        /```\s*\n([\s\S]*?)\n```/,
+        // Pattern 3: JSON object starting with { and ending with }
+        /(\{[\s\S]*\})/,
+      ];
+
+      for (const pattern of patterns) {
+        const match = responseText.match(pattern);
+        if (match) {
+          jsonText = match[1].trim();
+          break;
+        }
+      }
+
+      // Try to parse the JSON
       const parsed = JSON.parse(jsonText);
+
+      // Validate structure
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Response is not a valid object');
+      }
 
       return {
         enhancedPageTypes: parsed.enhancedPageTypes || [],
@@ -383,7 +410,15 @@ Return ONLY the JSON object, no additional text.`;
       };
     } catch (error) {
       logger.error('Failed to parse AI response');
-      logger.debug(responseText);
+      logger.error('Response preview (first 500 chars):');
+      logger.error(responseText.substring(0, 500));
+
+      if (responseText.length > 500) {
+        logger.error('Response preview (last 500 chars):');
+        logger.error(responseText.substring(responseText.length - 500));
+      }
+
+      logger.error(`Parse error: ${(error as Error).message}`);
       throw new Error('AI returned invalid JSON response');
     }
   }
