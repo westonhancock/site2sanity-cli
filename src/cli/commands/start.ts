@@ -584,7 +584,7 @@ export const startCommand = new Command('start')
                 type: 'confirm',
                 name: 'include',
                 message: `Include ${obj.type}: "${obj.name}" (${obj.instances.length} instance${obj.instances.length > 1 ? 's' : ''})?`,
-                default: obj.instances.length > 2,
+                default: true,
               },
             ]);
 
@@ -651,7 +651,7 @@ export const startCommand = new Command('start')
                 type: 'confirm',
                 name: 'include',
                 message: `Include "${block.name}" block (${block.occurrences} occurrence${block.occurrences > 1 ? 's' : ''})?`,
-                default: block.occurrences > 2,
+                default: true,
               },
             ]);
 
