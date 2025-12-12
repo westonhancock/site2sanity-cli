@@ -3,6 +3,8 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   Page,
   PageType,
@@ -69,7 +71,8 @@ export class AIAnalyzer {
    */
   async analyzeSite(
     pages: Page[],
-    pageTypes: PageType[]
+    pageTypes: PageType[],
+    workspacePath?: string
   ): Promise<AIAnalysisResult> {
     logger.info('Starting AI-powered analysis...');
 
@@ -85,13 +88,41 @@ export class AIAnalyzer {
     try {
       const prompt = this.buildAnalysisPrompt(samplesToAnalyze, pageTypes);
 
+      // Build message content with optional screenshots
+      const content: Array<any> = [];
+
+      // Add text prompt
+      content.push({
+        type: 'text',
+        text: prompt,
+      });
+
+      // Add screenshots if vision is enabled and workspace path is provided
+      if (this.config.useVision && workspacePath) {
+        logger.info('Including screenshots for visual analysis');
+        const screenshots = this.loadScreenshots(samplesToAnalyze, workspacePath);
+
+        for (const screenshot of screenshots) {
+          content.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: 'image/png',
+              data: screenshot.data,
+            },
+          });
+        }
+
+        logger.info(`Included ${screenshots.length} screenshots in analysis`);
+      }
+
       const message = await this.client.messages.create({
         model: this.config.model || 'claude-sonnet-4-5-20250929',
         max_tokens: 8000,
         messages: [
           {
             role: 'user',
-            content: prompt,
+            content,
           },
         ],
       });
@@ -140,6 +171,40 @@ export class AIAnalyzer {
   }
 
   /**
+   * Load screenshots for pages
+   */
+  private loadScreenshots(
+    pages: Page[],
+    workspacePath: string
+  ): Array<{ url: string; data: string }> {
+    const screenshots: Array<{ url: string; data: string }> = [];
+
+    for (const page of pages) {
+      if (page.screenshot) {
+        try {
+          const screenshotPath = path.join(workspacePath, page.screenshot);
+
+          if (fs.existsSync(screenshotPath)) {
+            const imageBuffer = fs.readFileSync(screenshotPath);
+            const base64Data = imageBuffer.toString('base64');
+
+            screenshots.push({
+              url: page.url,
+              data: base64Data,
+            });
+          } else {
+            logger.debug(`Screenshot not found: ${screenshotPath}`);
+          }
+        } catch (error) {
+          logger.debug(`Failed to load screenshot for ${page.url}: ${(error as Error).message}`);
+        }
+      }
+    }
+
+    return screenshots;
+  }
+
+  /**
    * Build comprehensive analysis prompt
    */
   private buildAnalysisPrompt(pages: Page[], pageTypes: PageType[]): string {
@@ -150,6 +215,7 @@ export class AIAnalyzer {
       mainContent: p.mainContent?.substring(0, 1000), // Limit content length
       jsonLd: p.jsonLd,
       meta: p.meta,
+      hasScreenshot: !!p.screenshot,
     }));
 
     const pageTypesData = pageTypes.map(pt => ({
@@ -160,11 +226,33 @@ export class AIAnalyzer {
       examples: pt.examples.slice(0, 3),
     }));
 
+    const hasScreenshots = pages.some(p => p.screenshot);
+    const visionInstructions = hasScreenshots ? `
+
+**IMPORTANT**: Screenshots of the pages are included with this analysis. Use these screenshots to:
+- Visually identify UI blocks and patterns (hero sections, CTAs, testimonials, feature grids, card layouts, forms, etc.)
+- Detect visual layout patterns that may not be obvious from HTML/text alone
+- Identify image-heavy sections that should be represented as blocks
+- Spot recurring visual components across different pages
+- Better understand the visual hierarchy and content structure
+
+When detecting blocks, pay special attention to:
+- Hero sections (large heading + text + CTA at top of page)
+- Call-to-action sections (prominent buttons/links)
+- Feature grids (multiple items in grid/column layout)
+- Testimonials (quotes with author info)
+- Logo clouds/partner sections
+- Image galleries or media sections
+- Stats/metrics displays
+- Team member cards
+- Pricing tables
+` : '';
+
     return `You are analyzing a website to generate a Sanity CMS schema. Your task is to:
 
 1. **Enhance Page Type Detection**: Review the detected page types and suggest better names, descriptions, and field structures.
 
-2. **Detect Reusable Blocks**: Identify repeating content patterns across pages (hero sections, CTAs, testimonials, feature grids, etc.) that should be Sanity blocks.
+2. **Detect Reusable Blocks**: Identify repeating content patterns across pages (hero sections, CTAs, testimonials, feature grids, etc.) that should be Sanity blocks.${visionInstructions}
 
 3. **Detect Content Objects**: Find reusable content objects (authors, categories, tags, locations, etc.) that should be references in Sanity.
 

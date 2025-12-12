@@ -4,11 +4,12 @@ An interactive CLI tool that crawls websites, derives information architecture a
 
 ## Features
 
-- 🕷️ **Smart Crawling**: HTML and headless browser modes with robots.txt support
+- 🕷️ **Smart Two-Phase Crawling**: Fast HTML crawl of entire site, followed by selective browser screenshots for AI analysis
 - 🗺️ **IA Discovery**: Automatic navigation structure and breadcrumb detection
 - 📄 **Page Type Detection**: Intelligent clustering based on URL patterns and content structure
-- 🤖 **AI-Powered Analysis**: Optional Claude AI integration for enhanced schema generation
-- 🧩 **Block Detection**: Automatically identifies reusable UI patterns (hero sections, CTAs, testimonials, etc.)
+- 🤖 **AI-Powered Analysis**: Optional Claude AI integration with vision capabilities for enhanced schema generation
+- 📸 **Vision-Based Block Detection**: Uses full-page screenshots to visually identify UI patterns (hero sections, CTAs, testimonials, feature grids, etc.)
+- 🧩 **Smart Block Detection**: Automatically identifies reusable UI components from visual layout
 - 🔍 **Object Detection**: Finds reusable content objects (authors, categories, tags, locations, etc.)
 - 🔗 **Relationship Detection**: Finds index-detail, taxonomy, and other content relationships
 - 🏗️ **Sanity-Native Schema**: Generates TypeScript schema with `defineType` following best practices
@@ -41,21 +42,38 @@ s2s
 ```
 
 That's it! The CLI will guide you through:
-1. Configuring the crawl (pages, depth, rendering)
-2. Crawling and analyzing the site
-3. (Optional) AI-powered analysis with Claude to detect blocks and enhance object detection
-4. Creating Sanity schema from detected page types
-5. Exporting TypeScript schema files
+1. Configuring the crawl (pages, depth, subdomain following)
+2. **Phase 1**: Fast HTML crawl of entire site to detect page types
+3. **Phase 2**: Selective screenshot capture of representative pages (3 per page type)
+4. (Optional) AI-powered visual analysis with Claude to detect blocks and enhance schema
+5. Creating Sanity schema from detected page types
+6. Exporting TypeScript schema files
+
+### Two-Phase Crawling
+
+The tool uses an intelligent two-phase approach:
+- **Phase 1 (HTML Crawl)**: Quickly crawls the entire site as HTML to detect all pages and cluster them into types (10-100x faster than browser crawling)
+- **Phase 2 (Screenshots)**: Optionally captures full-page screenshots of representative pages from each type (typically 3 per type) for AI visual analysis
+
+This approach provides comprehensive coverage while keeping crawl times fast and costs low.
 
 ### AI-Powered Analysis
 
 For best results, enable AI analysis when prompted. You'll need an [Anthropic API key](https://console.anthropic.com/) (starts with `sk-ant-`). The AI will:
-- **Detect reusable blocks**: Hero sections, CTAs, testimonials, feature grids, etc.
+- **Visual block detection**: Uses full-page screenshots to identify UI patterns (hero sections, CTAs, testimonials, feature grids, card layouts, forms, etc.)
+- **Detect reusable blocks**: Identifies repeating visual components across pages
 - **Enhance object detection**: Find authors, categories, tags, and other reusable content
-- **Suggest better field structures**: More accurate field types and descriptions
-- **Semantic understanding**: Analyzes content meaning, not just patterns
+- **Suggest better field structures**: More accurate field types and descriptions based on visual and semantic analysis
+- **Semantic understanding**: Analyzes content meaning and visual layout, not just patterns
 
-AI analysis is optional and uses Claude Sonnet 4.5 (the latest model). It analyzes up to 20 representative pages to keep costs low.
+AI analysis is optional and uses **Claude Sonnet 4.5 with vision capabilities** (the latest model). It analyzes up to 20 representative pages with their screenshots to keep costs low while providing comprehensive visual analysis.
+
+**Vision Features:**
+When screenshots are captured, Claude can:
+- Visually identify UI blocks that may not be obvious from HTML alone
+- Detect visual layout patterns (grids, columns, hero sections)
+- Identify image-heavy sections that should be represented as blocks
+- Better understand visual hierarchy and content structure
 
 ### Advanced: Individual Commands
 
@@ -266,8 +284,10 @@ The `config.json` file in your workspace directory controls crawling and analysi
   "crawl": {
     "maxPages": 1000,
     "maxDepth": 10,
+    "followSubdomains": false,
     "render": false,
     "screenshot": "none",
+    "screenshotSamplesPerType": 3,
     "throttle": 100,
     "concurrency": 5,
     "respectRobots": true
@@ -292,10 +312,25 @@ The `config.json` file in your workspace directory controls crawling and analysi
     "enabled": false,
     "provider": "anthropic",
     "model": "claude-sonnet-4-5-20250929",
-    "maxPagesPerAnalysis": 20
+    "maxPagesPerAnalysis": 20,
+    "useVision": true
   }
 }
 ```
+
+### Crawl Configuration
+
+The `crawl` section controls how pages are discovered and captured:
+
+- **maxPages**: Maximum number of pages to crawl
+- **maxDepth**: Maximum crawl depth from the base URL
+- **followSubdomains**: Whether to follow subdomains (e.g., follow `blog.example.com` when crawling `example.com`)
+- **render**: Whether to use headless browser (usually not needed with two-phase crawling)
+- **screenshot**: Screenshot mode for manual crawling (`"none"`, `"aboveFold"`, `"fullPage"`)
+- **screenshotSamplesPerType**: Number of representative screenshots to capture per page type (default: 3)
+- **throttle**: Milliseconds to wait between requests
+- **concurrency**: Number of parallel requests
+- **respectRobots**: Honor robots.txt rules
 
 ### AI Configuration
 
@@ -305,8 +340,15 @@ The `ai` section controls AI-powered analysis:
 - **provider**: AI provider (`"anthropic"` or `"openai"`)
 - **model**: Model to use (default: `claude-sonnet-4-5-20250929` - latest Claude Sonnet 4.5)
 - **maxPagesPerAnalysis**: Maximum pages to send for AI analysis (default: 20, controls costs)
+- **useVision**: Whether to use screenshots for visual analysis (default: `true`, requires screenshots to be captured)
 
-**Note**: The API key is not stored in config.json for security. You'll be prompted to enter it when AI analysis is enabled.
+**Vision Analysis**: When `useVision` is enabled and screenshots are captured, Claude will receive full-page screenshots along with HTML/text data. This enables:
+- Visual identification of UI blocks and patterns
+- Better understanding of layout and visual hierarchy
+- Detection of image-heavy sections
+- More accurate block field suggestions based on visual structure
+
+**Note**: The API key is not stored in config.json for security. You'll be prompted to enter it when AI analysis is enabled, or you can use the `s2s config` command to store it securely.
 
 ## Sanity Best Practices
 

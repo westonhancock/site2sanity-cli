@@ -92,15 +92,16 @@ export const startCommand = new Command('start')
         },
         {
           type: 'confirm',
-          name: 'render',
-          message: 'Use headless browser? (required for JS-heavy sites)',
-          default: true,
+          name: 'followSubdomains',
+          message: 'Follow subdomains? (e.g., blog.example.com when crawling example.com)',
+          default: false,
         },
       ]);
 
       config.crawl.maxPages = crawlAnswers.maxPages;
       config.crawl.maxDepth = crawlAnswers.maxDepth;
-      config.crawl.render = crawlAnswers.render;
+      config.crawl.followSubdomains = crawlAnswers.followSubdomains;
+      config.crawl.render = false; // Always use HTML crawl first (Phase 1)
 
       // Step 3: Crawl
       console.log();
@@ -149,6 +150,43 @@ export const startCommand = new Command('start')
       await workspace.saveJSON('objects.json', detectedObjects);
       logger.succeedSpinner(`Found ${detectedObjects.length} reusable object types`);
 
+      // Phase 2: Selective screenshot capture for AI analysis
+      console.log();
+      logger.section('Visual Analysis Preparation');
+
+      const screenshotAnswer = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'capture',
+          message: 'Capture screenshots for AI-powered block detection? (recommended)',
+          default: true,
+        },
+      ]);
+
+      let hasScreenshots = false;
+      if (screenshotAnswer.capture) {
+        // Select representative pages per type
+        const representativeUrls: string[] = [];
+        const samplesPerType = config.crawl.screenshotSamplesPerType || 3;
+
+        for (const pageType of pageTypes) {
+          const typePages = pageType.examples.slice(0, samplesPerType);
+          representativeUrls.push(...typePages);
+        }
+
+        logger.info(`Capturing ${representativeUrls.length} screenshots (${samplesPerType} per page type)`);
+        logger.startSpinner('Taking full-page screenshots...');
+
+        try {
+          await crawler.crawlWithScreenshots(representativeUrls);
+          hasScreenshots = true;
+          logger.succeedSpinner(`Captured ${representativeUrls.length} screenshots`);
+        } catch (error) {
+          logger.failSpinner(`Screenshot capture failed: ${(error as Error).message}`);
+          logger.info('Continuing without screenshots...');
+        }
+      }
+
       // AI-powered analysis (optional)
       let aiAnalysis: AIAnalysisResult | null = null;
       console.log();
@@ -156,7 +194,7 @@ export const startCommand = new Command('start')
         {
           type: 'confirm',
           name: 'enabled',
-          message: '🤖 Use AI to enhance analysis and detect blocks? (requires Anthropic API key)',
+          message: `🤖 Use AI to enhance analysis and detect blocks?${hasScreenshots ? ' (will use screenshots)' : ''} (requires Anthropic API key)`,
           default: true,
         },
       ]);
@@ -210,10 +248,10 @@ export const startCommand = new Command('start')
             model: 'claude-sonnet-4-5-20250929',
             apiKey: apiKey,
             maxPagesPerAnalysis: 20,
-            useVision: false, // Will be enabled when we add screenshot support
+            useVision: hasScreenshots,
           });
 
-          aiAnalysis = await aiAnalyzer.analyzeSite(pages, pageTypes);
+          aiAnalysis = await aiAnalyzer.analyzeSite(pages, pageTypes, workspace.getPath());
           await workspace.saveJSON('aiAnalysis.json', aiAnalysis);
 
           logger.succeedSpinner(
