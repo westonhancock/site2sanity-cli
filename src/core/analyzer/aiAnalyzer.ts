@@ -86,7 +86,7 @@ export class AIAnalyzer {
       const prompt = this.buildAnalysisPrompt(samplesToAnalyze, pageTypes);
 
       const message = await this.client.messages.create({
-        model: this.config.model || 'claude-3-5-sonnet-20241022',
+        model: this.config.model || 'claude-sonnet-4-5-20250929',
         max_tokens: 8000,
         messages: [
           {
@@ -102,7 +102,14 @@ export class AIAnalyzer {
 
       return this.parseAIResponse(responseText);
     } catch (error) {
-      logger.error(`AI analysis failed: ${(error as Error).message}`);
+      const err = error as any;
+      logger.error(`AI analysis failed: ${err.message}`);
+      if (err.status) {
+        logger.error(`Status: ${err.status}`);
+      }
+      if (err.error?.message) {
+        logger.error(`Details: ${err.error.message}`);
+      }
       throw error;
     }
   }

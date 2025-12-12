@@ -55,7 +55,7 @@ For best results, enable AI analysis when prompted. You'll need an [Anthropic AP
 - **Suggest better field structures**: More accurate field types and descriptions
 - **Semantic understanding**: Analyzes content meaning, not just patterns
 
-AI analysis is optional and uses Claude 3.5 Sonnet. It analyzes up to 20 representative pages to keep costs low.
+AI analysis is optional and uses Claude Sonnet 4.5 (the latest model). It analyzes up to 20 representative pages to keep costs low.
 
 ### Advanced: Individual Commands
 
@@ -291,7 +291,7 @@ The `config.json` file in your workspace directory controls crawling and analysi
   "ai": {
     "enabled": false,
     "provider": "anthropic",
-    "model": "claude-3-5-sonnet-20241022",
+    "model": "claude-sonnet-4-5-20250929",
     "maxPagesPerAnalysis": 20
   }
 }
@@ -303,7 +303,7 @@ The `ai` section controls AI-powered analysis:
 
 - **enabled**: Whether to use AI analysis (set interactively, or configure here)
 - **provider**: AI provider (`"anthropic"` or `"openai"`)
-- **model**: Model to use (default: `claude-3-5-sonnet-20241022`)
+- **model**: Model to use (default: `claude-sonnet-4-5-20250929` - latest Claude Sonnet 4.5)
 - **maxPagesPerAnalysis**: Maximum pages to send for AI analysis (default: 20, controls costs)
 
 **Note**: The API key is not stored in config.json for security. You'll be prompted to enter it when AI analysis is enabled.
