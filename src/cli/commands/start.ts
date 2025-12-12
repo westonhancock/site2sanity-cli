@@ -210,6 +210,7 @@ export const startCommand = new Command('start')
             model: 'claude-sonnet-4-5-20250929',
             apiKey: apiKey,
             maxPagesPerAnalysis: 20,
+            useVision: false, // Will be enabled when we add screenshot support
           });
 
           aiAnalysis = await aiAnalyzer.analyzeSite(pages, pageTypes);

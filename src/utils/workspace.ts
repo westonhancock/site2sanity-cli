@@ -49,8 +49,10 @@ export class Workspace {
         maxDepth: 10,
         include: [],
         exclude: [],
+        followSubdomains: false,
         render: false,
         screenshot: 'none',
+        screenshotSamplesPerType: 3, // Take 3 representative screenshots per page type
         throttle: 100,
         concurrency: 5,
         respectRobots: true,

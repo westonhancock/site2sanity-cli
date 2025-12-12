@@ -59,15 +59,54 @@ export function isValidUrl(url: string): boolean {
 /**
  * Check if URL is same origin
  */
-export function isSameOrigin(url: string, baseUrl: string): boolean {
+export function isSameOrigin(url: string, baseUrl: string, followSubdomains: boolean = false): boolean {
   try {
     const parsed1 = new URLParse(normalizeUrl(url));
     const parsed2 = new URLParse(normalizeUrl(baseUrl));
+
+    if (followSubdomains) {
+      // Check if same domain (including subdomains)
+      return isSameDomain(url, baseUrl);
+    }
 
     return parsed1.origin === parsed2.origin;
   } catch {
     return false;
   }
+}
+
+/**
+ * Check if URL is same domain (allowing subdomains)
+ */
+export function isSameDomain(url: string, baseUrl: string): boolean {
+  try {
+    const parsed1 = new URLParse(normalizeUrl(url));
+    const parsed2 = new URLParse(normalizeUrl(baseUrl));
+
+    // Get root domain from both URLs
+    const domain1 = getRootDomain(parsed1.hostname);
+    const domain2 = getRootDomain(parsed2.hostname);
+
+    return domain1 === domain2;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get root domain from hostname (e.g., "blog.example.com" -> "example.com")
+ */
+export function getRootDomain(hostname: string): string {
+  const parts = hostname.split('.');
+
+  // Handle cases like "localhost" or IP addresses
+  if (parts.length < 2) {
+    return hostname;
+  }
+
+  // Get last two parts for standard domains (example.com)
+  // This is a simple approach; doesn't handle .co.uk, etc.
+  return parts.slice(-2).join('.');
 }
 
 /**

@@ -17,8 +17,10 @@ export interface CrawlConfig {
   maxDepth: number;
   include?: string[];
   exclude?: string[];
+  followSubdomains: boolean;
   render: boolean;
   screenshot: 'none' | 'aboveFold' | 'fullPage';
+  screenshotSamplesPerType: number; // Number of representative screenshots per page type
   throttle: number;
   concurrency: number;
   respectRobots: boolean;
@@ -51,6 +53,7 @@ export interface AIConfig {
   model: string;
   apiKey?: string;
   maxPagesPerAnalysis: number; // Limit pages sent to AI to control costs
+  useVision: boolean; // Use screenshots for visual analysis of blocks
 }
 
 // Crawl data structures

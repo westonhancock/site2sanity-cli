@@ -89,6 +89,56 @@ export class Crawler {
   }
 
   /**
+   * Crawl specific pages with browser and take full-page screenshots
+   * Used after initial HTML crawl to capture visual layout for AI analysis
+   */
+  async crawlWithScreenshots(urls: string[]): Promise<void> {
+    if (urls.length === 0) {
+      logger.info('No URLs to screenshot');
+      return;
+    }
+
+    logger.info(`Taking full-page screenshots of ${urls.length} representative pages`);
+
+    try {
+      this.browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--disable-gpu',
+          '--window-size=1920x1080',
+        ],
+      });
+
+      let captured = 0;
+      for (const url of urls) {
+        try {
+          const normalizedUrl = normalizeUrl(url);
+          const page = await this.crawlRendered(normalizedUrl, true); // Force full-page screenshot
+          this.db.savePage(page);
+          captured++;
+          logger.info(`Captured screenshot ${captured}/${urls.length}: ${url}`);
+        } catch (error) {
+          logger.warn(`Failed to screenshot ${url}: ${(error as Error).message}`);
+        }
+      }
+
+      logger.success(`Captured ${captured} screenshots`);
+    } catch (error) {
+      logger.error(`Screenshot capture failed: ${(error as Error).message}`);
+      throw error;
+    } finally {
+      if (this.browser) {
+        await this.browser.close();
+        this.browser = null;
+      }
+    }
+  }
+
+  /**
    * Crawl a single page
    */
   private async crawlPage(url: string, depth: number): Promise<void> {
@@ -122,7 +172,7 @@ export class Crawler {
         // Extract and queue links
         if (depth < this.config.maxDepth) {
           const newLinks = page.links
-            .filter(link => isSameOrigin(link.href, this.baseUrl))
+            .filter(link => isSameOrigin(link.href, this.baseUrl, this.config.followSubdomains))
             .filter(link => !this.visited.has(normalizeUrl(link.href)))
             .filter(link => !this.shouldExclude(normalizeUrl(link.href)));
 
@@ -208,7 +258,7 @@ export class Crawler {
   /**
    * Crawl using headless browser
    */
-  private async crawlRendered(url: string): Promise<Page> {
+  private async crawlRendered(url: string, forceFullPage: boolean = false): Promise<Page> {
     if (!this.browser) {
       throw new Error('Browser not initialized');
     }
@@ -230,12 +280,13 @@ export class Crawler {
 
       const pageData = this.extractPageData(url, $, response?.status() || 200);
 
-      // Screenshot if configured
-      if (this.config.screenshot !== 'none') {
+      // Screenshot if configured or forced
+      if (forceFullPage || this.config.screenshot !== 'none') {
         const screenshotPath = `screenshot-${urlToId(url)}.png`;
+        const takeFullPage = forceFullPage || this.config.screenshot === 'fullPage';
         await page.screenshot({
           path: screenshotPath,
-          fullPage: this.config.screenshot === 'fullPage',
+          fullPage: takeFullPage,
         });
         pageData.screenshot = screenshotPath;
       }
