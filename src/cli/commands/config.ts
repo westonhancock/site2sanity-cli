@@ -9,7 +9,7 @@ import { logger } from '../../utils/logger';
 import chalk from 'chalk';
 
 export const configCommand = new Command('config')
-  .description('Manage API keys and configuration')
+  .description('Manage API keys for AI-powered analysis (Anthropic Claude, OpenAI)')
   .action(async () => {
     try {
       logger.section('Configuration');

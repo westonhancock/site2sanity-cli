@@ -24,7 +24,7 @@ const program = new Command();
 
 program
   .name('s2s')
-  .description('An interactive CLI that crawls websites and generates Sanity CMS schema')
+  .description('Interactive CLI: two-phase website crawling with AI vision analysis to generate Sanity CMS schemas')
   .version('0.1.0');
 
 // Primary interactive command

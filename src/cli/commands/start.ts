@@ -18,10 +18,10 @@ import * as path from 'path';
 import chalk from 'chalk';
 
 export const startCommand = new Command('start')
-  .description('Start interactive site analysis and Sanity schema generation (supports AI-powered analysis)')
+  .description('Interactive workflow: two-phase crawl (HTML + screenshots), AI-powered analysis with vision, and Sanity schema generation')
   .argument('[url]', 'Base URL of the site to analyze (optional - will prompt if not provided)')
   .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
-  .option('--no-ai', 'Skip AI-powered analysis')
+  .option('--no-ai', 'Skip AI-powered analysis with vision (blocks, objects, enhanced fields)')
   .action(async (url: string | undefined, options: any) => {
     try {
       logger.section('Welcome to site2sanity!');
