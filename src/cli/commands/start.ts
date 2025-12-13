@@ -18,7 +18,7 @@ import * as path from 'path';
 import chalk from 'chalk';
 
 export const startCommand = new Command('start')
-  .description('Interactive workflow: two-phase crawl (HTML + screenshots), AI-powered analysis with vision, and Sanity schema generation')
+  .description('Interactive workflow: two-phase crawl (HTML + screenshots), AI-powered analysis with vision, schema generation, and optional Sanity Studio setup')
   .argument('[url]', 'Base URL of the site to analyze (optional - will prompt if not provided)')
   .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
   .option('--no-ai', 'Skip AI-powered analysis with vision (blocks, objects, enhanced fields)')
