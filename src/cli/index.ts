@@ -18,6 +18,7 @@ import { doctorCommand } from './commands/doctor';
 import { cleanupCommand } from './commands/cleanup';
 import { projectCommand } from './commands/project';
 import { configCommand } from './commands/config';
+import { sanityInitCommand } from './commands/sanity-init';
 
 const program = new Command();
 
@@ -45,6 +46,9 @@ program.addCommand(cleanupCommand);
 
 // Configuration
 program.addCommand(configCommand);
+
+// Sanity project initialization
+program.addCommand(sanityInitCommand);
 
 // Parse arguments
 program.parse(process.argv);
