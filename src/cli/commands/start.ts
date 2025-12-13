@@ -655,16 +655,112 @@ export const startCommand = new Command('start')
         logger.succeedSpinner('Schema exported!');
 
         console.log();
-        logger.success('All done!');
-        console.log();
         logger.info('Generated files:');
         console.log(`  ${outDir}/sanity/schemaTypes/`);
         console.log(`  ${outDir}/sanity/README.md`);
         console.log();
-        logger.info('Next steps:');
-        console.log('  1. Copy schemaTypes/ to your Sanity Studio project');
-        console.log('  2. Follow instructions in README.md');
-        console.log('  3. Customize the schema for your needs');
+
+        // Step 8: Offer to initialize Sanity Studio
+        const initSanityAnswer = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'initSanity',
+            message: 'Would you like to initialize a new Sanity Studio project with these schemas?',
+            default: true,
+          },
+        ]);
+
+        if (initSanityAnswer.initSanity) {
+          console.log();
+          logger.section('Initialize Sanity Studio');
+          logger.info('This will create a new Sanity Studio project and integrate your generated schemas.');
+          console.log();
+          logger.info('You can also run this later with: s2s sanity-init');
+          console.log();
+
+          const studioPath = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'path',
+              message: 'Where should the Sanity Studio be created?',
+              default: './studio',
+            },
+          ]);
+
+          const studioName = await inquirer.prompt([
+            {
+              type: 'input',
+              name: 'name',
+              message: 'What would you like to name your Sanity project?',
+              default: path.basename(path.resolve(studioPath.path)),
+            },
+          ]);
+
+          console.log();
+          logger.info('Starting Sanity CLI wizard...');
+          logger.info('You may be prompted to log in or create a Sanity account.');
+          console.log(chalk.dim('Follow the prompts to complete the setup.\n'));
+
+          // Run sanity init
+          const { spawn } = await import('child_process');
+          const studioOutputPath = path.resolve(studioPath.path);
+
+          const sanityInitSuccess = await new Promise<boolean>((resolve) => {
+            const args = ['create', 'sanity@latest', '--'];
+            args.push('--output-path', studioOutputPath);
+            args.push('--create-project', studioName.name);
+            args.push('--dataset-default');
+            args.push('--template', 'clean');
+            args.push('--no-mcp');
+
+            const child = spawn('npm', args, {
+              stdio: 'inherit',
+              shell: true,
+            });
+
+            child.on('close', (code) => resolve(code === 0));
+            child.on('error', () => resolve(false));
+          });
+
+          if (sanityInitSuccess) {
+            // Wait a moment for files to be written
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // Copy schema files
+            logger.startSpinner('Integrating generated schemas...');
+
+            try {
+              const { copySchemaFilesToProject, updateSanityConfigFile } = await import('./sanity-init');
+              await copySchemaFilesToProject(outDir, studioOutputPath);
+              await updateSanityConfigFile(studioOutputPath);
+              logger.succeedSpinner('Schemas integrated successfully!');
+
+              console.log();
+              logger.success('Sanity Studio created!');
+              console.log();
+              logger.info('To start your studio:');
+              console.log(`  1. ${chalk.cyan(`cd ${path.relative(process.cwd(), studioOutputPath)}`)}`);
+              console.log(`  2. ${chalk.cyan('npm run dev')}`);
+              console.log(`  3. Open ${chalk.cyan('http://localhost:3333')} in your browser`);
+            } catch (error) {
+              logger.failSpinner(`Failed to integrate schemas: ${(error as Error).message}`);
+              logger.info('You can manually run: s2s sanity-init --skip-init');
+            }
+          } else {
+            logger.warn('Sanity initialization did not complete.');
+            logger.info('You can run "s2s sanity-init" later to create a Sanity Studio.');
+          }
+        } else {
+          console.log();
+          logger.success('All done!');
+          console.log();
+          logger.info('Next steps:');
+          console.log('  1. Copy schemaTypes/ to your Sanity Studio project');
+          console.log('  2. Follow instructions in README.md');
+          console.log('  3. Customize the schema for your needs');
+          console.log();
+          logger.info('Or run "s2s sanity-init" to create a new Sanity Studio project.');
+        }
       }
 
       db.close();
