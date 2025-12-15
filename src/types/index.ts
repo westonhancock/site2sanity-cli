@@ -200,6 +200,8 @@ export interface ObjectField {
   type: string;
   required: boolean;
   examples: any[];
+  fields?: ObjectField[]; // For nested objects
+  of?: Array<{ type: string; fields?: ObjectField[] }>; // For arrays
 }
 
 export interface StructuredDataPattern {
@@ -268,6 +270,7 @@ export interface SanityField {
   options?: any;
   fieldset?: string;
   hidden?: boolean | ((context: any) => boolean);
+  fields?: SanityField[]; // For nested objects
 }
 
 export interface SanityPreview {

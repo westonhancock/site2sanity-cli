@@ -490,6 +490,21 @@ export const startCommand = new Command('start')
       });
       console.log();
 
+      // Track all type names to prevent duplicates
+      const usedTypeNames = new Set<string>();
+
+      // Helper function to get unique type name
+      const getUniqueTypeName = (baseName: string): string => {
+        let uniqueName = baseName;
+        let counter = 2;
+        while (usedTypeNames.has(uniqueName)) {
+          uniqueName = `${baseName}${counter}`;
+          counter++;
+        }
+        usedTypeNames.add(uniqueName);
+        return uniqueName;
+      };
+
       // Map each type to Sanity schema
       for (const pageType of finalTypes) {
         const typeAnswers = await inquirer.prompt([
@@ -519,8 +534,11 @@ export const startCommand = new Command('start')
             .map(w => w.charAt(0).toUpperCase() + w.slice(1))
             .join(' ');
 
+          // Ensure unique type name
+          const uniqueDocName = getUniqueTypeName(typeAnswers.documentName);
+
           model.documents.push({
-            name: typeAnswers.documentName,
+            name: uniqueDocName,
             title: titleCaseName,
             type: 'document',
             mode: 'builder',
@@ -565,6 +583,36 @@ export const startCommand = new Command('start')
         return typeMap[type] || 'string';
       };
 
+      // Recursively map ObjectField to Sanity field definition
+      const mapFieldToSanity = (field: any): any => {
+        const sanityField: any = {
+          name: field.name,
+          title: field.name.charAt(0).toUpperCase() + field.name.slice(1),
+          type: mapToSanityType(field.type),
+          validation: field.required ? 'required' : undefined,
+        };
+
+        // Handle nested objects
+        if (field.type === 'object' && field.fields && field.fields.length > 0) {
+          sanityField.fields = field.fields.map(mapFieldToSanity);
+        }
+
+        // Handle arrays
+        if (field.type === 'array' && field.of && field.of.length > 0) {
+          sanityField.of = field.of.map((ofType: any) => {
+            if (ofType.type === 'object' && ofType.fields) {
+              return {
+                type: 'object',
+                fields: ofType.fields.map(mapFieldToSanity)
+              };
+            }
+            return { type: mapToSanityType(ofType.type) };
+          });
+        }
+
+        return sanityField;
+      };
+
       // Add object types from detected objects
       if (detectedObjects.length > 0) {
         console.log();
@@ -602,13 +650,8 @@ export const startCommand = new Command('start')
                 )
                 .join('');
 
-              // Create Sanity fields from detected fields
-              const sanityFields = obj.suggestedFields.map(field => ({
-                name: field.name,
-                title: field.name.charAt(0).toUpperCase() + field.name.slice(1),
-                type: mapToSanityType(field.type),
-                validation: field.required ? 'required' : undefined,
-              }));
+              // Create Sanity fields from detected fields (with nested object/array support)
+              const sanityFields = obj.suggestedFields.map(mapFieldToSanity);
 
               // Ensure basic fields exist
               if (!sanityFields.find(f => f.name === 'name')) {
@@ -620,8 +663,11 @@ export const startCommand = new Command('start')
                 });
               }
 
+              // Ensure unique type name
+              const uniqueObjName = getUniqueTypeName(camelCaseName);
+
               model.objects.push({
-                name: camelCaseName,
+                name: uniqueObjName,
                 title: titleCaseName,
                 type: 'object',
                 fields: sanityFields,
@@ -668,15 +714,20 @@ export const startCommand = new Command('start')
                 .map(w => w.charAt(0).toUpperCase() + w.slice(1))
                 .join(' ');
 
-              const sanityFields = block.fields.map(field => ({
-                name: field.name,
-                title: field.name.charAt(0).toUpperCase() + field.name.slice(1),
-                type: mapToSanityType(field.type),
-                description: field.description,
-              }));
+              const sanityFields = block.fields.map((field: any) => {
+                const mappedField = mapFieldToSanity(field);
+                // Add description if present
+                if (field.description) {
+                  mappedField.description = field.description;
+                }
+                return mappedField;
+              });
+
+              // Ensure unique type name
+              const uniqueBlockName = getUniqueTypeName(camelCaseName);
 
               model.blocks.push({
-                name: camelCaseName,
+                name: uniqueBlockName,
                 title: titleCaseName,
                 type: 'object',
                 fields: sanityFields,
@@ -698,8 +749,11 @@ export const startCommand = new Command('start')
       ]);
 
       if (settingsAnswer.addSettings) {
+        // Ensure unique type name
+        const uniqueSettingsName = getUniqueTypeName('siteSettings');
+
         model.singletons.push({
-          name: 'siteSettings',
+          name: uniqueSettingsName,
           title: 'Site Settings',
           type: 'document',
           singleton: true,

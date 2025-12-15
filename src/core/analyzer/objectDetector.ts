@@ -427,32 +427,90 @@ export class ObjectDetector {
    * Infer field structure from object instances
    */
   private inferFields(instances: ContentObjectInstance[]): ObjectField[] {
-    const fieldMap = new Map<string, { type: Set<string>; required: number; examples: any[] }>();
+    const fieldMap = new Map<string, {
+      type: Set<string>;
+      required: number;
+      examples: any[];
+      nestedInstances?: any[]; // For analyzing nested objects/arrays
+    }>();
 
     for (const instance of instances) {
       for (const [key, value] of Object.entries(instance.data)) {
-        if (!fieldMap.has(key)) {
-          fieldMap.set(key, { type: new Set(), required: 0, examples: [] });
+        // Sanitize field name to make it valid for Sanity
+        const sanitizedKey = this.sanitizeFieldName(key);
+
+        if (!fieldMap.has(sanitizedKey)) {
+          fieldMap.set(sanitizedKey, { type: new Set(), required: 0, examples: [], nestedInstances: [] });
         }
 
-        const field = fieldMap.get(key)!;
+        const field = fieldMap.get(sanitizedKey)!;
         field.required++;
         field.type.add(this.inferType(value));
 
         if (field.examples.length < 3) {
           field.examples.push(value);
         }
+
+        // Store nested values for later analysis
+        if (value !== null && value !== undefined) {
+          field.nestedInstances!.push(value);
+        }
       }
     }
 
     const fields: ObjectField[] = [];
     for (const [name, data] of fieldMap.entries()) {
-      fields.push({
+      const baseType = this.consolidateTypes(Array.from(data.type));
+      const field: ObjectField = {
         name,
-        type: this.consolidateTypes(Array.from(data.type)),
+        type: baseType,
         required: data.required >= instances.length * 0.8, // 80% threshold
         examples: data.examples,
-      });
+      };
+
+      // Handle nested objects
+      if (baseType === 'object' && data.nestedInstances && data.nestedInstances.length > 0) {
+        const objectInstances = data.nestedInstances
+          .filter(v => v && typeof v === 'object' && !Array.isArray(v))
+          .map(v => ({ pageUrl: '', data: v, source: 'content' as const }));
+
+        if (objectInstances.length > 0) {
+          field.fields = this.inferFields(objectInstances);
+        }
+      }
+
+      // Handle arrays
+      if (baseType === 'array' && data.nestedInstances && data.nestedInstances.length > 0) {
+        const arrayInstances = data.nestedInstances.filter(v => Array.isArray(v));
+        if (arrayInstances.length > 0) {
+          // Analyze first non-empty array to determine item type
+          const firstArray = arrayInstances.find(arr => arr.length > 0);
+          if (firstArray && firstArray.length > 0) {
+            const firstItem = firstArray[0];
+            const itemType = this.inferType(firstItem);
+
+            if (itemType === 'object' && typeof firstItem === 'object' && firstItem !== null) {
+              // Array of objects - infer nested structure
+              const allItems = arrayInstances.flatMap(arr => arr);
+              const itemInstances = allItems
+                .filter(item => item && typeof item === 'object')
+                .map(item => ({ pageUrl: '', data: item, source: 'content' as const }));
+
+              if (itemInstances.length > 0) {
+                field.of = [{
+                  type: 'object',
+                  fields: this.inferFields(itemInstances)
+                }];
+              }
+            } else {
+              // Array of primitives
+              field.of = [{ type: itemType }];
+            }
+          }
+        }
+      }
+
+      fields.push(field);
     }
 
     return fields;
@@ -492,13 +550,68 @@ export class ObjectDetector {
   }
 
   /**
+   * Sanitize field name to be valid for Sanity
+   * Field names must match /^[a-zA-Z_][a-zA-Z0-9_]*$/
+   */
+  private sanitizeFieldName(name: string): string {
+    // Handle common JSON-LD properties
+    if (name.startsWith('@')) {
+      name = name.slice(1); // @type → type, @context → context
+    }
+
+    // Transliterate non-ASCII characters
+    const charMap: Record<string, string> = {
+      'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a', 'æ': 'ae',
+      'ç': 'c', 'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e', 'ì': 'i', 'í': 'i',
+      'î': 'i', 'ï': 'i', 'ñ': 'n', 'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o',
+      'ö': 'o', 'ø': 'o', 'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u', 'ý': 'y',
+      'ÿ': 'y', 'ā': 'a', 'ē': 'e', 'ī': 'i', 'ō': 'o', 'ū': 'u',
+    };
+
+    let result = name;
+    for (const [char, replacement] of Object.entries(charMap)) {
+      result = result.replace(new RegExp(char, 'g'), replacement);
+    }
+
+    // Remove any characters that aren't alphanumeric or underscore
+    result = result.replace(/[^a-zA-Z0-9_]/g, '_');
+
+    // Ensure it starts with a letter or underscore
+    if (/^[0-9]/.test(result)) {
+      result = '_' + result;
+    }
+
+    // If empty after sanitization, use a default
+    if (!result) {
+      result = 'field';
+    }
+
+    return result;
+  }
+
+  /**
    * Slugify a string
    */
   private slugify(str: string): string {
-    return str
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+    // Transliteration map for common non-ASCII characters
+    const charMap: Record<string, string> = {
+      'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a', 'æ': 'ae',
+      'ç': 'c', 'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e', 'ì': 'i', 'í': 'i',
+      'î': 'i', 'ï': 'i', 'ñ': 'n', 'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o',
+      'ö': 'o', 'ø': 'o', 'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u', 'ý': 'y',
+      'ÿ': 'y', 'ā': 'a', 'ē': 'e', 'ī': 'i', 'ō': 'o', 'ū': 'u',
+    };
+
+    // Transliterate non-ASCII characters
+    let result = str.toLowerCase();
+    for (const [char, replacement] of Object.entries(charMap)) {
+      result = result.replace(new RegExp(char, 'g'), replacement);
+    }
+
+    // Remove any remaining non-ASCII and special characters
+    return result
+      .replace(/[^a-z0-9\s-]/g, '')  // Only allow a-z, 0-9, spaces, and hyphens
+      .replace(/[\s_-]+/g, '-')      // Replace spaces/underscores with hyphens
+      .replace(/^-+|-+$/g, '');      // Trim hyphens from start/end
   }
 }

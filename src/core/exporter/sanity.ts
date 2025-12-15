@@ -14,9 +14,106 @@ export class SanityExporter {
   }
 
   /**
+   * Validate model before export
+   */
+  private validateModel(model: SanityModel): string[] {
+    const errors: string[] = [];
+    const nameRegex = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+    const allTypeNames = new Set<string>();
+
+    // Helper to check duplicate names
+    const checkDuplicate = (name: string, category: string): void => {
+      if (allTypeNames.has(name)) {
+        errors.push(`Duplicate type name "${name}" found in ${category}`);
+      } else {
+        allTypeNames.add(name);
+      }
+    };
+
+    // Helper to validate field names
+    const validateFields = (fields: SanityField[], typeName: string): void => {
+      if (!fields || !Array.isArray(fields)) {
+        errors.push(`Type "${typeName}" has invalid fields property (must be an array)`);
+        return;
+      }
+
+      for (const field of fields) {
+        if (!field.name || !nameRegex.test(field.name)) {
+          errors.push(`Type "${typeName}" has invalid field name: "${field.name}"`);
+        }
+
+        // Recursively validate nested object fields
+        if (field.type === 'object' && field.fields) {
+          validateFields(field.fields as SanityField[], `${typeName}.${field.name}`);
+        }
+
+        // Validate array 'of' property
+        if (field.type === 'array') {
+          if (!field.of || !Array.isArray(field.of) || field.of.length === 0) {
+            errors.push(`Type "${typeName}" field "${field.name}" is an array but missing required "of" property`);
+          } else {
+            // Validate nested array item types
+            for (const ofType of field.of) {
+              if (ofType.type === 'object' && ofType.fields) {
+                validateFields(ofType.fields as SanityField[], `${typeName}.${field.name}[item]`);
+              }
+            }
+          }
+        }
+      }
+    };
+
+    // Validate documents
+    for (const doc of model.documents) {
+      if (!doc.name || !nameRegex.test(doc.name)) {
+        errors.push(`Invalid document type name: "${doc.name}"`);
+      }
+      checkDuplicate(doc.name, 'documents');
+      validateFields(doc.fields, doc.name);
+    }
+
+    // Validate singletons
+    for (const singleton of model.singletons || []) {
+      if (!singleton.name || !nameRegex.test(singleton.name)) {
+        errors.push(`Invalid singleton type name: "${singleton.name}"`);
+      }
+      checkDuplicate(singleton.name, 'singletons');
+      validateFields(singleton.fields, singleton.name);
+    }
+
+    // Validate objects
+    for (const obj of model.objects) {
+      if (!obj.name || !nameRegex.test(obj.name)) {
+        errors.push(`Invalid object type name: "${obj.name}"`);
+      }
+      checkDuplicate(obj.name, 'objects');
+      validateFields(obj.fields, obj.name);
+    }
+
+    // Validate blocks
+    for (const block of model.blocks) {
+      if (!block.name || !nameRegex.test(block.name)) {
+        errors.push(`Invalid block type name: "${block.name}"`);
+      }
+      checkDuplicate(block.name, 'blocks');
+      validateFields(block.fields, block.name);
+    }
+
+    return errors;
+  }
+
+  /**
    * Export Sanity schema as TypeScript
    */
   async export(model: SanityModel): Promise<void> {
+    // Validate model before export
+    const validationErrors = this.validateModel(model);
+    if (validationErrors.length > 0) {
+      throw new Error(
+        `Schema validation failed:\n${validationErrors.map(e => `  • ${e}`).join('\n')}`
+      );
+    }
+
     // Create directory structure
     const schemaDir = path.join(this.outDir, 'sanity', 'schemaTypes');
     const docDir = path.join(schemaDir, 'documents');
@@ -96,13 +193,33 @@ ${fields}
       const options = field.options ? `,\n${indent}  options: ${JSON.stringify(field.options, null, 2).split('\n').join(`\n${indent}  `)}` : '';
       const validation = field.validation ? `,\n${indent}  validation: (Rule) => Rule.${field.validation}()` : '';
       const description = field.description ? `,\n${indent}  description: '${field.description}'` : '';
-      const of = field.of ? `,\n${indent}  of: ${JSON.stringify(field.of, null, 2).split('\n').join(`\n${indent}  `)}` : '';
+
+      // Handle nested object fields
+      let nestedFields = '';
+      if (field.type === 'object' && field.fields && field.fields.length > 0) {
+        const nestedFieldsStr = this.generateFields(field.fields, indent + '  ');
+        nestedFields = `,\n${indent}  fields: [\n${nestedFieldsStr}\n${indent}  ]`;
+      }
+
+      // Handle array 'of' property (can contain nested objects)
+      let of = '';
+      if (field.of && field.of.length > 0) {
+        const ofItems = field.of.map(ofItem => {
+          if (ofItem.type === 'object' && ofItem.fields) {
+            const ofFieldsStr = this.generateFields(ofItem.fields, indent + '    ');
+            return `{\n${indent}    type: 'object',\n${indent}    fields: [\n${ofFieldsStr}\n${indent}    ]\n${indent}  }`;
+          }
+          return JSON.stringify(ofItem);
+        }).join(',\n' + indent + '  ');
+        of = `,\n${indent}  of: [\n${indent}  ${ofItems}\n${indent}  ]`;
+      }
+
       const to = field.to ? `,\n${indent}  to: ${JSON.stringify(field.to, null, 2).split('\n').join(`\n${indent}  `)}` : '';
 
       return `${indent}defineField({
 ${indent}  name: '${field.name}',
 ${indent}  title: '${field.title}',
-${indent}  type: '${field.type}'${options}${validation}${description}${of}${to}
+${indent}  type: '${field.type}'${options}${validation}${description}${nestedFields}${of}${to}
 ${indent}})`;
     }).join(',\n');
   }
