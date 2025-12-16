@@ -146,7 +146,7 @@ export const startCommand = new Command('start')
       logger.succeedSpinner(`Found ${relationships.length} relationships`);
 
       logger.startSpinner('Detecting content objects...');
-      let detectedObjects = analyzer.detectObjects();
+      let detectedObjects = await analyzer.detectObjects();
       await workspace.saveJSON('objects.json', detectedObjects);
       logger.succeedSpinner(`Found ${detectedObjects.length} reusable object types`);
 
@@ -253,6 +253,16 @@ export const startCommand = new Command('start')
 
           aiAnalysis = await aiAnalyzer.analyzeSite(pages, pageTypes, workspace.getPath());
           await workspace.saveJSON('aiAnalysis.json', aiAnalysis);
+
+          // Re-run object detection with AI validation
+          logger.startSpinner('Re-validating detected objects with AI...');
+          const aiValidatedAnalyzer = new Analyzer(pages, aiAnalyzer);
+          const aiValidatedObjects = await aiValidatedAnalyzer.detectObjects();
+
+          // Replace detected objects with AI-validated ones
+          detectedObjects = aiValidatedObjects;
+          await workspace.saveJSON('objects.json', detectedObjects);
+          logger.succeedSpinner('Object detection validated with AI');
 
           logger.succeedSpinner(
             `AI found ${aiAnalysis.detectedBlocks.length} blocks, enhanced ${aiAnalysis.enhancedObjects.length} objects`

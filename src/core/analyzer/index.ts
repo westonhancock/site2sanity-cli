@@ -6,12 +6,15 @@ import { Page, NavigationStructure, PageType, Relationship, NavItem, BreadcrumbP
 import { extractUrlPattern, getPathSegments, normalizeUrl } from '../../utils/url';
 import levenshtein from 'fast-levenshtein';
 import { ObjectDetector } from './objectDetector';
+import { AIAnalyzer } from './aiAnalyzer';
 
 export class Analyzer {
   private pages: Page[];
+  private aiAnalyzer?: AIAnalyzer;
 
-  constructor(pages: Page[]) {
+  constructor(pages: Page[], aiAnalyzer?: AIAnalyzer) {
     this.pages = pages.filter(p => p.status === 200);
+    this.aiAnalyzer = aiAnalyzer;
   }
 
   /**
@@ -136,9 +139,9 @@ export class Analyzer {
   /**
    * Detect reusable content objects (authors, categories, tags, etc.)
    */
-  detectObjects(): DetectedObject[] {
-    const detector = new ObjectDetector(this.pages);
-    return detector.detectObjects();
+  async detectObjects(): Promise<DetectedObject[]> {
+    const detector = new ObjectDetector(this.pages, this.aiAnalyzer);
+    return await detector.detectObjects();
   }
 
   /**

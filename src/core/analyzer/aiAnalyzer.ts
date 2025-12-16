@@ -10,6 +10,7 @@ import {
   PageType,
   DetectedObject,
   AIConfig,
+  ContentObjectInstance,
 } from '../../types';
 import { logger } from '../../utils/logger';
 
@@ -420,6 +421,184 @@ IMPORTANT:
 
       logger.error(`Parse error: ${(error as Error).message}`);
       throw new Error('AI returned invalid JSON response');
+    }
+  }
+
+  /**
+   * Validate that detected instances represent the same semantic type
+   * Returns validation result with any outliers detected
+   */
+  async validateInstanceSimilarity(
+    instances: ContentObjectInstance[],
+    typeName: string
+  ): Promise<{
+    valid: boolean;
+    validInstances: ContentObjectInstance[];
+    outliers: Array<{ pageUrl: string; data: Record<string, any>; reason: string }>;
+    confidence: number;
+    reasoning: string;
+  }> {
+    // Sample instances for analysis (max 10 to control costs)
+    const sampleSize = Math.min(10, instances.length);
+    const samples = this.sampleInstances(instances, sampleSize);
+
+    const prompt = `Analyze these content instances to determine if they all represent the same semantic type of content object.
+
+Type: ${typeName}
+
+Instances to analyze (${samples.length} samples from ${instances.length} total):
+${samples.map((inst, i) => `
+Instance ${i + 1}:
+  Source: ${inst.source}
+  Page: ${inst.pageUrl}
+  Data: ${JSON.stringify(inst.data, null, 2)}`).join('\n')}
+
+Please analyze whether all these instances represent the same semantic category of "${typeName}".
+
+Return a JSON object with the following structure:
+\`\`\`json
+{
+  "valid": true/false,
+  "outlierIndices": [0, 3],
+  "confidence": 0.0-1.0,
+  "reasoning": "Explanation of your analysis"
+}
+\`\`\`
+
+Criteria for validation:
+1. Do all instances have similar field structures?
+2. Do they represent the same category of content?
+3. Are there any instances that clearly don't belong?
+
+IMPORTANT:
+- Return ONLY the JSON object with no additional text
+- The response should start with { and end with }
+- Be generous in validation - only flag clear outliers
+- If 80%+ of instances match the pattern, mark as valid`;
+
+    try {
+      const response = await this.client.messages.create({
+        model: this.config.model || 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        temperature: 0,
+        system: 'You are an expert at analyzing content structure and semantic similarity. Return only valid JSON with no additional commentary.',
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      });
+
+      const responseText = response.content[0].type === 'text'
+        ? response.content[0].text
+        : '';
+
+      // Parse response
+      const result = this.parseValidationResponse(responseText);
+
+      // Map outlier indices back to actual instances
+      const validInstances = instances.filter((_, i) => {
+        const sampleIndex = samples.findIndex(s => s.pageUrl === instances[i].pageUrl);
+        return sampleIndex === -1 || !result.outlierIndices.includes(sampleIndex);
+      });
+
+      const outliers = result.outlierIndices
+        .map(idx => samples[idx])
+        .filter(Boolean)
+        .map(inst => ({
+          pageUrl: inst.pageUrl,
+          data: inst.data,
+          reason: 'Detected as outlier by AI analysis',
+        }));
+
+      return {
+        valid: result.valid,
+        validInstances,
+        outliers,
+        confidence: result.confidence,
+        reasoning: result.reasoning,
+      };
+    } catch (error) {
+      logger.warn(`AI validation failed: ${(error as Error).message}`);
+      // On error, return all instances as valid (fail open)
+      return {
+        valid: true,
+        validInstances: instances,
+        outliers: [],
+        confidence: 0.5,
+        reasoning: 'AI validation unavailable, accepting all instances',
+      };
+    }
+  }
+
+  /**
+   * Sample instances for analysis
+   */
+  private sampleInstances(
+    instances: ContentObjectInstance[],
+    count: number
+  ): ContentObjectInstance[] {
+    if (instances.length <= count) {
+      return instances;
+    }
+
+    // Take evenly distributed samples
+    const step = Math.floor(instances.length / count);
+    const samples: ContentObjectInstance[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const index = Math.min(i * step, instances.length - 1);
+      samples.push(instances[index]);
+    }
+
+    return samples;
+  }
+
+  /**
+   * Parse validation response
+   */
+  private parseValidationResponse(responseText: string): {
+    valid: boolean;
+    outlierIndices: number[];
+    confidence: number;
+    reasoning: string;
+  } {
+    try {
+      let jsonText = responseText;
+
+      // Try multiple extraction patterns
+      const patterns = [
+        /```json\s*\n([\s\S]*?)\n```/,
+        /```\s*\n([\s\S]*?)\n```/,
+        /(\{[\s\S]*\})/,
+      ];
+
+      for (const pattern of patterns) {
+        const match = responseText.match(pattern);
+        if (match) {
+          jsonText = match[1].trim();
+          break;
+        }
+      }
+
+      const parsed = JSON.parse(jsonText);
+
+      return {
+        valid: parsed.valid ?? true,
+        outlierIndices: parsed.outlierIndices || [],
+        confidence: parsed.confidence ?? 0.8,
+        reasoning: parsed.reasoning || 'No reasoning provided',
+      };
+    } catch (error) {
+      logger.warn(`Failed to parse validation response: ${(error as Error).message}`);
+      // Fail open - accept all instances if parsing fails
+      return {
+        valid: true,
+        outlierIndices: [],
+        confidence: 0.5,
+        reasoning: 'Parse error, accepting all instances',
+      };
     }
   }
 }

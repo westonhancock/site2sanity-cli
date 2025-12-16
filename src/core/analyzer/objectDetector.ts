@@ -9,41 +9,45 @@ import {
   ObjectField,
   StructuredDataPattern,
 } from '../../types';
+import { AIAnalyzer } from './aiAnalyzer';
+import { logger } from '../../utils/logger';
 
 export class ObjectDetector {
   private pages: Page[];
+  private aiAnalyzer?: AIAnalyzer;
 
-  constructor(pages: Page[]) {
+  constructor(pages: Page[], aiAnalyzer?: AIAnalyzer) {
     this.pages = pages;
+    this.aiAnalyzer = aiAnalyzer;
   }
 
   /**
    * Detect all reusable objects across the site
    */
-  detectObjects(): DetectedObject[] {
+  async detectObjects(): Promise<DetectedObject[]> {
     const objects: DetectedObject[] = [];
 
     // Detect authors
-    const authors = this.detectAuthors();
+    const authors = await this.detectAuthors();
     objects.push(...authors);
 
     // Detect categories/tags from various sources
-    const categories = this.detectCategories();
+    const categories = await this.detectCategories();
     objects.push(...categories);
 
-    const tags = this.detectTags();
+    const tags = await this.detectTags();
     objects.push(...tags);
 
     // Detect locations (addresses, places)
-    const locations = this.detectLocations();
+    const locations = await this.detectLocations();
     objects.push(...locations);
 
     // Detect events
-    const events = this.detectEvents();
+    const events = await this.detectEvents();
     objects.push(...events);
 
     // Detect products
-    const products = this.detectProducts();
+    const products = await this.detectProducts();
     objects.push(...products);
 
     // Detect custom structured data patterns
@@ -57,7 +61,7 @@ export class ObjectDetector {
    * Detect authors from JSON-LD, meta tags, and content
    * Returns a single generic 'author' type with all instances aggregated
    */
-  private detectAuthors(): DetectedObject[] {
+  private async detectAuthors(): Promise<DetectedObject[]> {
     const allAuthorInstances: ContentObjectInstance[] = [];
     const uniqueAuthors = new Set<string>();
 
@@ -96,20 +100,23 @@ export class ObjectDetector {
       }
     }
 
-    // Create a single generic 'author' type if we found at least 2 instances
-    if (allAuthorInstances.length >= 2) {
-      const fields = this.inferFields(allAuthorInstances);
-      const confidence = this.calculateConfidence(allAuthorInstances.length);
+    // Validate instances using AI if available
+    const validatedInstances = await this.validateInstances(allAuthorInstances, 'author');
+
+    // Create a single generic 'author' type if we found at least 2 valid instances
+    if (validatedInstances.length >= 2) {
+      const fields = this.inferFields(validatedInstances);
+      const confidence = this.calculateConfidence(validatedInstances.length);
 
       return [{
         id: 'author',
         type: 'author',
         name: 'author',
-        instances: allAuthorInstances,
+        instances: validatedInstances,
         confidence,
         suggestedFields: fields,
-        pageTypeRefs: [...new Set(allAuthorInstances.map(i => this.getPageUrl(i.pageUrl)))],
-        rationale: `Found ${allAuthorInstances.length} author instances (${uniqueAuthors.size} unique) across the site with consistent field structure`,
+        pageTypeRefs: [...new Set(validatedInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${validatedInstances.length} author instances (${uniqueAuthors.size} unique) across the site with consistent field structure`,
       }];
     }
 
@@ -120,7 +127,7 @@ export class ObjectDetector {
    * Detect categories from URLs, JSON-LD, and content
    * Returns a single generic 'category' type with all instances aggregated
    */
-  private detectCategories(): DetectedObject[] {
+  private async detectCategories(): Promise<DetectedObject[]> {
     const allCategoryInstances: ContentObjectInstance[] = [];
     const uniqueCategories = new Set<string>();
 
@@ -179,20 +186,23 @@ export class ObjectDetector {
       }
     }
 
-    // Create a single generic 'category' type if we found at least 2 instances
-    if (allCategoryInstances.length >= 2) {
-      const fields = this.inferFields(allCategoryInstances);
-      const confidence = this.calculateConfidence(allCategoryInstances.length);
+    // Validate instances using AI if available
+    const validatedInstances = await this.validateInstances(allCategoryInstances, 'category');
+
+    // Create a single generic 'category' type if we found at least 2 valid instances
+    if (validatedInstances.length >= 2) {
+      const fields = this.inferFields(validatedInstances);
+      const confidence = this.calculateConfidence(validatedInstances.length);
 
       return [{
         id: 'category',
         type: 'category',
         name: 'category',
-        instances: allCategoryInstances,
+        instances: validatedInstances,
         confidence,
         suggestedFields: fields,
-        pageTypeRefs: [...new Set(allCategoryInstances.map(i => this.getPageUrl(i.pageUrl)))],
-        rationale: `Found ${allCategoryInstances.length} category instances (${uniqueCategories.size} unique) across the site with consistent field structure`,
+        pageTypeRefs: [...new Set(validatedInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${validatedInstances.length} category instances (${uniqueCategories.size} unique) across the site with consistent field structure`,
       }];
     }
 
@@ -203,7 +213,7 @@ export class ObjectDetector {
    * Detect tags from meta keywords and JSON-LD
    * Returns a single generic 'tag' type with all instances aggregated
    */
-  private detectTags(): DetectedObject[] {
+  private async detectTags(): Promise<DetectedObject[]> {
     const allTagInstances: ContentObjectInstance[] = [];
     const uniqueTags = new Set<string>();
 
@@ -247,20 +257,23 @@ export class ObjectDetector {
       }
     }
 
-    // Create a single generic 'tag' type if we found at least 2 instances
-    if (allTagInstances.length >= 2) {
-      const fields = this.inferFields(allTagInstances);
-      const confidence = this.calculateConfidence(allTagInstances.length);
+    // Validate instances using AI if available
+    const validatedInstances = await this.validateInstances(allTagInstances, 'tag');
+
+    // Create a single generic 'tag' type if we found at least 2 valid instances
+    if (validatedInstances.length >= 2) {
+      const fields = this.inferFields(validatedInstances);
+      const confidence = this.calculateConfidence(validatedInstances.length);
 
       return [{
         id: 'tag',
         type: 'tag',
         name: 'tag',
-        instances: allTagInstances,
+        instances: validatedInstances,
         confidence,
         suggestedFields: fields,
-        pageTypeRefs: [...new Set(allTagInstances.map(i => this.getPageUrl(i.pageUrl)))],
-        rationale: `Found ${allTagInstances.length} tag instances (${uniqueTags.size} unique) across the site with consistent field structure`,
+        pageTypeRefs: [...new Set(validatedInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${validatedInstances.length} tag instances (${uniqueTags.size} unique) across the site with consistent field structure`,
       }];
     }
 
@@ -271,7 +284,7 @@ export class ObjectDetector {
    * Detect locations from JSON-LD address data
    * Returns a single generic 'location' type with all instances aggregated
    */
-  private detectLocations(): DetectedObject[] {
+  private async detectLocations(): Promise<DetectedObject[]> {
     const allLocationInstances: ContentObjectInstance[] = [];
     const uniqueLocations = new Set<string>();
 
@@ -293,20 +306,23 @@ export class ObjectDetector {
       }
     }
 
-    // Create a single generic 'location' type if we found at least 2 instances
-    if (allLocationInstances.length >= 2) {
-      const fields = this.inferFields(allLocationInstances);
-      const confidence = this.calculateConfidence(allLocationInstances.length);
+    // Validate instances using AI if available
+    const validatedInstances = await this.validateInstances(allLocationInstances, 'location');
+
+    // Create a single generic 'location' type if we found at least 2 valid instances
+    if (validatedInstances.length >= 2) {
+      const fields = this.inferFields(validatedInstances);
+      const confidence = this.calculateConfidence(validatedInstances.length);
 
       return [{
         id: 'location',
         type: 'location',
         name: 'location',
-        instances: allLocationInstances,
+        instances: validatedInstances,
         confidence,
         suggestedFields: fields,
-        pageTypeRefs: [...new Set(allLocationInstances.map(i => this.getPageUrl(i.pageUrl)))],
-        rationale: `Found ${allLocationInstances.length} location instances (${uniqueLocations.size} unique) across the site with consistent field structure`,
+        pageTypeRefs: [...new Set(validatedInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${validatedInstances.length} location instances (${uniqueLocations.size} unique) across the site with consistent field structure`,
       }];
     }
 
@@ -317,7 +333,7 @@ export class ObjectDetector {
    * Detect events from JSON-LD
    * Returns a single generic 'event' type with all instances aggregated
    */
-  private detectEvents(): DetectedObject[] {
+  private async detectEvents(): Promise<DetectedObject[]> {
     const allEventInstances: ContentObjectInstance[] = [];
     const uniqueEvents = new Set<string>();
 
@@ -338,20 +354,23 @@ export class ObjectDetector {
       }
     }
 
-    // Create a single generic 'event' type if we found at least 2 instances
-    if (allEventInstances.length >= 2) {
-      const fields = this.inferFields(allEventInstances);
-      const confidence = this.calculateConfidence(allEventInstances.length);
+    // Validate instances using AI if available
+    const validatedInstances = await this.validateInstances(allEventInstances, 'event');
+
+    // Create a single generic 'event' type if we found at least 2 valid instances
+    if (validatedInstances.length >= 2) {
+      const fields = this.inferFields(validatedInstances);
+      const confidence = this.calculateConfidence(validatedInstances.length);
 
       return [{
         id: 'event',
         type: 'event',
         name: 'event',
-        instances: allEventInstances,
+        instances: validatedInstances,
         confidence,
         suggestedFields: fields,
-        pageTypeRefs: [...new Set(allEventInstances.map(i => this.getPageUrl(i.pageUrl)))],
-        rationale: `Found ${allEventInstances.length} event instances (${uniqueEvents.size} unique) across the site with consistent field structure`,
+        pageTypeRefs: [...new Set(validatedInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${validatedInstances.length} event instances (${uniqueEvents.size} unique) across the site with consistent field structure`,
       }];
     }
 
@@ -362,7 +381,7 @@ export class ObjectDetector {
    * Detect products from JSON-LD
    * Returns a single generic 'product' type with all instances aggregated
    */
-  private detectProducts(): DetectedObject[] {
+  private async detectProducts(): Promise<DetectedObject[]> {
     const allProductInstances: ContentObjectInstance[] = [];
     const uniqueProducts = new Set<string>();
 
@@ -383,20 +402,23 @@ export class ObjectDetector {
       }
     }
 
-    // Create a single generic 'product' type if we found at least 2 instances
-    if (allProductInstances.length >= 2) {
-      const fields = this.inferFields(allProductInstances);
-      const confidence = this.calculateConfidence(allProductInstances.length);
+    // Validate instances using AI if available
+    const validatedInstances = await this.validateInstances(allProductInstances, 'product');
+
+    // Create a single generic 'product' type if we found at least 2 valid instances
+    if (validatedInstances.length >= 2) {
+      const fields = this.inferFields(validatedInstances);
+      const confidence = this.calculateConfidence(validatedInstances.length);
 
       return [{
         id: 'product',
         type: 'product',
         name: 'product',
-        instances: allProductInstances,
+        instances: validatedInstances,
         confidence,
         suggestedFields: fields,
-        pageTypeRefs: [...new Set(allProductInstances.map(i => this.getPageUrl(i.pageUrl)))],
-        rationale: `Found ${allProductInstances.length} product instances (${uniqueProducts.size} unique) across the site with consistent field structure`,
+        pageTypeRefs: [...new Set(validatedInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${validatedInstances.length} product instances (${uniqueProducts.size} unique) across the site with consistent field structure`,
       }];
     }
 
@@ -576,6 +598,35 @@ export class ObjectDetector {
     }
 
     return result;
+  }
+
+  /**
+   * Validate instances using AI if available
+   */
+  private async validateInstances(
+    instances: ContentObjectInstance[],
+    typeName: string
+  ): Promise<ContentObjectInstance[]> {
+    if (!this.aiAnalyzer || instances.length < 2) {
+      return instances;
+    }
+
+    try {
+      logger.debug(`Validating ${instances.length} instances of ${typeName} using AI...`);
+      const result = await this.aiAnalyzer.validateInstanceSimilarity(instances, typeName);
+
+      if (result.outliers.length > 0) {
+        logger.info(
+          `AI validation for ${typeName}: removed ${result.outliers.length} outlier(s) (confidence: ${result.confidence})`
+        );
+        logger.debug(`Reasoning: ${result.reasoning}`);
+      }
+
+      return result.validInstances;
+    } catch (error) {
+      logger.warn(`AI validation failed for ${typeName}: ${(error as Error).message}`);
+      return instances; // Fail open
+    }
   }
 
   /**
