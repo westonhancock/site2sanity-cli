@@ -184,7 +184,7 @@ export const startCommand = new Command('start')
       console.log();
       logger.section('Analyzing Site Structure');
 
-      const pages = db.getAllPages();
+      let pages = db.getAllPages();
       const analyzer = new Analyzer(pages);
 
       logger.startSpinner('Analyzing navigation...');
@@ -242,6 +242,9 @@ export const startCommand = new Command('start')
           await crawler.crawlWithScreenshots(representativeUrls);
           hasScreenshots = true;
           logger.succeedSpinner(`Captured ${representativeUrls.length} screenshots`);
+
+          // Reload pages from database to get updated screenshot paths
+          pages = db.getAllPages();
         } catch (error) {
           logger.failSpinner(`Screenshot capture failed: ${(error as Error).message}`);
           logger.info('Continuing without screenshots...');
