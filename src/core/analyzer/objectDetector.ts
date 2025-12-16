@@ -55,9 +55,11 @@ export class ObjectDetector {
 
   /**
    * Detect authors from JSON-LD, meta tags, and content
+   * Returns a single generic 'author' type with all instances aggregated
    */
   private detectAuthors(): DetectedObject[] {
-    const authorMap = new Map<string, ContentObjectInstance[]>();
+    const allAuthorInstances: ContentObjectInstance[] = [];
+    const uniqueAuthors = new Set<string>();
 
     for (const page of this.pages) {
       // Check JSON-LD
@@ -68,10 +70,8 @@ export class ObjectDetector {
             for (const author of authors) {
               const name = typeof author === 'string' ? author : author.name;
               if (name) {
-                if (!authorMap.has(name)) {
-                  authorMap.set(name, []);
-                }
-                authorMap.get(name)!.push({
+                uniqueAuthors.add(name);
+                allAuthorInstances.push({
                   pageUrl: page.url,
                   data: typeof author === 'string' ? { name: author } : author,
                   source: 'jsonld',
@@ -87,10 +87,8 @@ export class ObjectDetector {
       const authorMeta = metaAny.author || metaAny['article:author'];
       if (authorMeta) {
         const name = authorMeta;
-        if (!authorMap.has(name)) {
-          authorMap.set(name, []);
-        }
-        authorMap.get(name)!.push({
+        uniqueAuthors.add(name);
+        allAuthorInstances.push({
           pageUrl: page.url,
           data: { name },
           source: 'meta',
@@ -98,33 +96,33 @@ export class ObjectDetector {
       }
     }
 
-    const result: DetectedObject[] = [];
-    for (const [name, instances] of authorMap.entries()) {
-      if (instances.length >= 1) {
-        // Determine fields from instances
-        const fields = this.inferFields(instances);
+    // Create a single generic 'author' type if we found at least 2 instances
+    if (allAuthorInstances.length >= 2) {
+      const fields = this.inferFields(allAuthorInstances);
+      const confidence = this.calculateConfidence(allAuthorInstances.length);
 
-        result.push({
-          id: `author-${this.slugify(name)}`,
-          type: 'author',
-          name,
-          instances,
-          confidence: instances.length > 3 ? 0.9 : 0.7,
-          suggestedFields: fields,
-          pageTypeRefs: [...new Set(instances.map(i => this.getPageUrl(i.pageUrl)))],
-          rationale: `Found ${instances.length} references to this author across the site`,
-        });
-      }
+      return [{
+        id: 'author',
+        type: 'author',
+        name: 'author',
+        instances: allAuthorInstances,
+        confidence,
+        suggestedFields: fields,
+        pageTypeRefs: [...new Set(allAuthorInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${allAuthorInstances.length} author instances (${uniqueAuthors.size} unique) across the site with consistent field structure`,
+      }];
     }
 
-    return result;
+    return [];
   }
 
   /**
    * Detect categories from URLs, JSON-LD, and content
+   * Returns a single generic 'category' type with all instances aggregated
    */
   private detectCategories(): DetectedObject[] {
-    const categoryMap = new Map<string, ContentObjectInstance[]>();
+    const allCategoryInstances: ContentObjectInstance[] = [];
+    const uniqueCategories = new Set<string>();
 
     for (const page of this.pages) {
       // Check JSON-LD categories
@@ -136,10 +134,8 @@ export class ObjectDetector {
             for (const cat of cats) {
               const name = typeof cat === 'string' ? cat : cat.name;
               if (name) {
-                if (!categoryMap.has(name)) {
-                  categoryMap.set(name, []);
-                }
-                categoryMap.get(name)!.push({
+                uniqueCategories.add(name);
+                allCategoryInstances.push({
                   pageUrl: page.url,
                   data: typeof cat === 'string' ? { name: cat } : cat,
                   source: 'jsonld',
@@ -155,10 +151,8 @@ export class ObjectDetector {
       for (const link of breadcrumbLinks) {
         const name = link.text;
         if (name && name !== 'Home') {
-          if (!categoryMap.has(name)) {
-            categoryMap.set(name, []);
-          }
-          categoryMap.get(name)!.push({
+          uniqueCategories.add(name);
+          allCategoryInstances.push({
             pageUrl: page.url,
             data: { name, url: link.href },
             source: 'content',
@@ -174,10 +168,8 @@ export class ObjectDetector {
           if (parts.length > 1) {
             const categorySlug = parts[1].split('/')[0];
             const name = categorySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            if (!categoryMap.has(name)) {
-              categoryMap.set(name, []);
-            }
-            categoryMap.get(name)!.push({
+            uniqueCategories.add(name);
+            allCategoryInstances.push({
               pageUrl: page.url,
               data: { name, slug: categorySlug },
               source: 'structured',
@@ -187,32 +179,33 @@ export class ObjectDetector {
       }
     }
 
-    const result: DetectedObject[] = [];
-    for (const [name, instances] of categoryMap.entries()) {
-      if (instances.length >= 2) {
-        const fields = this.inferFields(instances);
+    // Create a single generic 'category' type if we found at least 2 instances
+    if (allCategoryInstances.length >= 2) {
+      const fields = this.inferFields(allCategoryInstances);
+      const confidence = this.calculateConfidence(allCategoryInstances.length);
 
-        result.push({
-          id: `category-${this.slugify(name)}`,
-          type: 'category',
-          name,
-          instances,
-          confidence: instances.length > 5 ? 0.9 : 0.7,
-          suggestedFields: fields,
-          pageTypeRefs: [...new Set(instances.map(i => this.getPageUrl(i.pageUrl)))],
-          rationale: `Found ${instances.length} pages in this category`,
-        });
-      }
+      return [{
+        id: 'category',
+        type: 'category',
+        name: 'category',
+        instances: allCategoryInstances,
+        confidence,
+        suggestedFields: fields,
+        pageTypeRefs: [...new Set(allCategoryInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${allCategoryInstances.length} category instances (${uniqueCategories.size} unique) across the site with consistent field structure`,
+      }];
     }
 
-    return result;
+    return [];
   }
 
   /**
    * Detect tags from meta keywords and JSON-LD
+   * Returns a single generic 'tag' type with all instances aggregated
    */
   private detectTags(): DetectedObject[] {
-    const tagMap = new Map<string, ContentObjectInstance[]>();
+    const allTagInstances: ContentObjectInstance[] = [];
+    const uniqueTags = new Set<string>();
 
     for (const page of this.pages) {
       // Check JSON-LD keywords
@@ -224,10 +217,8 @@ export class ObjectDetector {
             for (const tag of tags) {
               const name = tag.trim();
               if (name) {
-                if (!tagMap.has(name)) {
-                  tagMap.set(name, []);
-                }
-                tagMap.get(name)!.push({
+                uniqueTags.add(name);
+                allTagInstances.push({
                   pageUrl: page.url,
                   data: { name },
                   source: 'jsonld',
@@ -245,10 +236,8 @@ export class ObjectDetector {
         for (const tag of tags) {
           const name = tag.trim();
           if (name) {
-            if (!tagMap.has(name)) {
-              tagMap.set(name, []);
-            }
-            tagMap.get(name)!.push({
+            uniqueTags.add(name);
+            allTagInstances.push({
               pageUrl: page.url,
               data: { name },
               source: 'meta',
@@ -258,32 +247,33 @@ export class ObjectDetector {
       }
     }
 
-    const result: DetectedObject[] = [];
-    for (const [name, instances] of tagMap.entries()) {
-      if (instances.length >= 3) {
-        const fields = this.inferFields(instances);
+    // Create a single generic 'tag' type if we found at least 2 instances
+    if (allTagInstances.length >= 2) {
+      const fields = this.inferFields(allTagInstances);
+      const confidence = this.calculateConfidence(allTagInstances.length);
 
-        result.push({
-          id: `tag-${this.slugify(name)}`,
-          type: 'tag',
-          name,
-          instances,
-          confidence: instances.length > 5 ? 0.8 : 0.6,
-          suggestedFields: fields,
-          pageTypeRefs: [...new Set(instances.map(i => this.getPageUrl(i.pageUrl)))],
-          rationale: `Found ${instances.length} pages with this tag`,
-        });
-      }
+      return [{
+        id: 'tag',
+        type: 'tag',
+        name: 'tag',
+        instances: allTagInstances,
+        confidence,
+        suggestedFields: fields,
+        pageTypeRefs: [...new Set(allTagInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${allTagInstances.length} tag instances (${uniqueTags.size} unique) across the site with consistent field structure`,
+      }];
     }
 
-    return result;
+    return [];
   }
 
   /**
    * Detect locations from JSON-LD address data
+   * Returns a single generic 'location' type with all instances aggregated
    */
   private detectLocations(): DetectedObject[] {
-    const locationMap = new Map<string, ContentObjectInstance[]>();
+    const allLocationInstances: ContentObjectInstance[] = [];
+    const uniqueLocations = new Set<string>();
 
     for (const page of this.pages) {
       if (page.jsonLd) {
@@ -292,10 +282,8 @@ export class ObjectDetector {
             const address = item.address || item;
             const name = item.name || 'Unknown Location';
 
-            if (!locationMap.has(name)) {
-              locationMap.set(name, []);
-            }
-            locationMap.get(name)!.push({
+            uniqueLocations.add(name);
+            allLocationInstances.push({
               pageUrl: page.url,
               data: address,
               source: 'jsonld',
@@ -305,32 +293,33 @@ export class ObjectDetector {
       }
     }
 
-    const result: DetectedObject[] = [];
-    for (const [name, instances] of locationMap.entries()) {
-      if (instances.length >= 1) {
-        const fields = this.inferFields(instances);
+    // Create a single generic 'location' type if we found at least 2 instances
+    if (allLocationInstances.length >= 2) {
+      const fields = this.inferFields(allLocationInstances);
+      const confidence = this.calculateConfidence(allLocationInstances.length);
 
-        result.push({
-          id: `location-${this.slugify(name)}`,
-          type: 'location',
-          name,
-          instances,
-          confidence: 0.8,
-          suggestedFields: fields,
-          pageTypeRefs: [...new Set(instances.map(i => this.getPageUrl(i.pageUrl)))],
-          rationale: `Found location data on ${instances.length} page(s)`,
-        });
-      }
+      return [{
+        id: 'location',
+        type: 'location',
+        name: 'location',
+        instances: allLocationInstances,
+        confidence,
+        suggestedFields: fields,
+        pageTypeRefs: [...new Set(allLocationInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${allLocationInstances.length} location instances (${uniqueLocations.size} unique) across the site with consistent field structure`,
+      }];
     }
 
-    return result;
+    return [];
   }
 
   /**
    * Detect events from JSON-LD
+   * Returns a single generic 'event' type with all instances aggregated
    */
   private detectEvents(): DetectedObject[] {
-    const eventMap = new Map<string, ContentObjectInstance[]>();
+    const allEventInstances: ContentObjectInstance[] = [];
+    const uniqueEvents = new Set<string>();
 
     for (const page of this.pages) {
       if (page.jsonLd) {
@@ -338,10 +327,8 @@ export class ObjectDetector {
           if (item['@type'] === 'Event') {
             const name = item.name || 'Unknown Event';
 
-            if (!eventMap.has(name)) {
-              eventMap.set(name, []);
-            }
-            eventMap.get(name)!.push({
+            uniqueEvents.add(name);
+            allEventInstances.push({
               pageUrl: page.url,
               data: item,
               source: 'jsonld',
@@ -351,30 +338,33 @@ export class ObjectDetector {
       }
     }
 
-    const result: DetectedObject[] = [];
-    for (const [name, instances] of eventMap.entries()) {
-      const fields = this.inferFields(instances);
+    // Create a single generic 'event' type if we found at least 2 instances
+    if (allEventInstances.length >= 2) {
+      const fields = this.inferFields(allEventInstances);
+      const confidence = this.calculateConfidence(allEventInstances.length);
 
-      result.push({
-        id: `event-${this.slugify(name)}`,
+      return [{
+        id: 'event',
         type: 'event',
-        name,
-        instances,
-        confidence: 0.9,
+        name: 'event',
+        instances: allEventInstances,
+        confidence,
         suggestedFields: fields,
-        pageTypeRefs: [...new Set(instances.map(i => this.getPageUrl(i.pageUrl)))],
-        rationale: `Event found with structured data`,
-      });
+        pageTypeRefs: [...new Set(allEventInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${allEventInstances.length} event instances (${uniqueEvents.size} unique) across the site with consistent field structure`,
+      }];
     }
 
-    return result;
+    return [];
   }
 
   /**
    * Detect products from JSON-LD
+   * Returns a single generic 'product' type with all instances aggregated
    */
   private detectProducts(): DetectedObject[] {
-    const productMap = new Map<string, ContentObjectInstance[]>();
+    const allProductInstances: ContentObjectInstance[] = [];
+    const uniqueProducts = new Set<string>();
 
     for (const page of this.pages) {
       if (page.jsonLd) {
@@ -382,10 +372,8 @@ export class ObjectDetector {
           if (item['@type'] === 'Product') {
             const name = item.name || 'Unknown Product';
 
-            if (!productMap.has(name)) {
-              productMap.set(name, []);
-            }
-            productMap.get(name)!.push({
+            uniqueProducts.add(name);
+            allProductInstances.push({
               pageUrl: page.url,
               data: item,
               source: 'jsonld',
@@ -395,23 +383,24 @@ export class ObjectDetector {
       }
     }
 
-    const result: DetectedObject[] = [];
-    for (const [name, instances] of productMap.entries()) {
-      const fields = this.inferFields(instances);
+    // Create a single generic 'product' type if we found at least 2 instances
+    if (allProductInstances.length >= 2) {
+      const fields = this.inferFields(allProductInstances);
+      const confidence = this.calculateConfidence(allProductInstances.length);
 
-      result.push({
-        id: `product-${this.slugify(name)}`,
+      return [{
+        id: 'product',
         type: 'product',
-        name,
-        instances,
-        confidence: 0.9,
+        name: 'product',
+        instances: allProductInstances,
+        confidence,
         suggestedFields: fields,
-        pageTypeRefs: [...new Set(instances.map(i => this.getPageUrl(i.pageUrl)))],
-        rationale: `Product found with structured data`,
-      });
+        pageTypeRefs: [...new Set(allProductInstances.map(i => this.getPageUrl(i.pageUrl)))],
+        rationale: `Found ${allProductInstances.length} product instances (${uniqueProducts.size} unique) across the site with consistent field structure`,
+      }];
     }
 
-    return result;
+    return [];
   }
 
   /**
@@ -587,6 +576,16 @@ export class ObjectDetector {
     }
 
     return result;
+  }
+
+  /**
+   * Calculate confidence score based on instance count
+   */
+  private calculateConfidence(instanceCount: number): number {
+    if (instanceCount >= 10) return 0.95;
+    if (instanceCount >= 5) return 0.85;
+    if (instanceCount >= 2) return 0.7;
+    return 0.5;
   }
 
   /**

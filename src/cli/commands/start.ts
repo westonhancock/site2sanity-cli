@@ -330,11 +330,25 @@ export const startCommand = new Command('start')
           const source = obj.id.startsWith('ai-') ? '🤖 AI' : 'Pattern';
           const instanceCount = obj.instances.length > 0 ? `${obj.instances.length} instance${obj.instances.length > 1 ? 's' : ''}` : 'suggested';
 
-          console.log(`\n  ${chalk.bold(obj.name)} ${chalk.dim(`(${obj.type})`)} ${chalk.dim(`[${source}]`)}`);
-          console.log(`    ${chalk.dim('Instances:')} ${instanceCount}`);
+          console.log(`\n  ${chalk.bold(obj.name)} ${chalk.dim(`(${instanceCount})`)} ${chalk.dim(`[${source}]`)}`);
 
-          if (obj.rationale) {
-            console.log(`    ${chalk.dim('Description:')} ${obj.rationale}`);
+          // Show field structure
+          if (obj.suggestedFields && obj.suggestedFields.length > 0) {
+            const fieldNames = obj.suggestedFields.map(f => f.name).join(', ');
+            console.log(`    ${chalk.dim('Fields:')} ${fieldNames}`);
+          }
+
+          // Show unique examples
+          const uniqueExamples = [...new Set(
+            obj.instances
+              .map(i => i.data.name || i.data.title || (typeof i.data === 'string' ? i.data : JSON.stringify(i.data).slice(0, 30)))
+              .filter(Boolean)
+          )].slice(0, 3);
+
+          if (uniqueExamples.length > 0) {
+            const examplesStr = uniqueExamples.join(', ');
+            const more = obj.instances.length > uniqueExamples.length ? ` +${obj.instances.length - uniqueExamples.length} more` : '';
+            console.log(`    ${chalk.dim('Examples:')} ${examplesStr}${more}`);
           }
 
           if (obj.pageTypeRefs && obj.pageTypeRefs.length > 0) {
@@ -343,13 +357,6 @@ export const startCommand = new Command('start')
               return pt ? pt.name : ref;
             }).join(', ');
             console.log(`    ${chalk.dim('Referenced by:')} ${refNames}`);
-          }
-
-          // Show sample fields
-          if (obj.suggestedFields && obj.suggestedFields.length > 0) {
-            const fieldNames = obj.suggestedFields.slice(0, 3).map(f => f.name).join(', ');
-            const more = obj.suggestedFields.length > 3 ? ` +${obj.suggestedFields.length - 3} more` : '';
-            console.log(`    ${chalk.dim('Fields:')} ${fieldNames}${more}`);
           }
         });
       }
@@ -627,28 +634,24 @@ export const startCommand = new Command('start')
 
         if (includeObjectsAnswer.include) {
           for (const obj of detectedObjects) {
+            // Get unique instance count for display
+            const uniqueInstances = new Set(
+              obj.instances.map(i => i.data.name || i.data.title || JSON.stringify(i.data).slice(0, 30))
+            ).size;
+
             const objTypeAnswer = await inquirer.prompt([
               {
                 type: 'confirm',
                 name: 'include',
-                message: `Include ${obj.type}: "${obj.name}" (${obj.instances.length} instance${obj.instances.length > 1 ? 's' : ''})?`,
+                message: `Include ${obj.type} (${obj.instances.length} instances, ${uniqueInstances} unique)?`,
                 default: true,
               },
             ]);
 
             if (objTypeAnswer.include) {
-              // Convert object type to Sanity schema
-              const titleCaseName = obj.name
-                .split(/[\s-]/)
-                .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-                .join(' ');
-
-              const camelCaseName = obj.name
-                .split(/[\s-]/)
-                .map((word, index) =>
-                  index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1)
-                )
-                .join('');
+              // obj.name is already the generic type name (e.g., "author", "category")
+              const camelCaseName = obj.name; // Already in correct format
+              const titleCaseName = obj.name.charAt(0).toUpperCase() + obj.name.slice(1);
 
               // Create Sanity fields from detected fields (with nested object/array support)
               const sanityFields = obj.suggestedFields.map(mapFieldToSanity);
