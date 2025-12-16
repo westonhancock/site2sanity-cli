@@ -660,6 +660,71 @@ s2s export --json
 
 ---
 
+## Implementation Status
+
+### Phase 1: Core Non-Interactive Mode ✅ COMPLETED
+
+The following has been implemented:
+
+#### New Files Created:
+- `src/utils/output.ts` - JSON output helpers with structured error codes
+- `src/cli/commands/status.ts` - Workspace status introspection
+- `src/cli/commands/list.ts` - Query page-types, objects, blocks, documents
+
+#### Commands Updated with `--json` Support:
+- `s2s crawl --json` - Returns structured crawl results
+- `s2s analyze --json` - Returns page types, objects, relationships
+- `s2s export --json --types <filter> --exclude-types <filter>` - Returns exported files list
+
+#### New Commands:
+```bash
+# Check workspace status
+s2s status --json
+
+# List detected content
+s2s list page-types --json
+s2s list objects --json
+s2s list blocks --json
+s2s list documents --json
+```
+
+### Example AI Agent Workflow (Now Working)
+
+```bash
+# Step 1: Initialize workspace (existing command)
+s2s init https://example.com
+
+# Step 2: Crawl with JSON output
+s2s crawl --max-pages 50 --json
+# Returns: {"success": true, "data": {"stats": {"totalPages": 50, ...}}}
+
+# Step 3: Analyze with JSON output
+s2s analyze --json
+# Returns: {"success": true, "data": {"pageTypes": [...], "objects": [...]}}
+
+# Step 4: Check status
+s2s status --json
+# Returns: {"success": true, "data": {"phases": {"crawl": {"complete": true}, ...}}}
+
+# Step 5: List detected page types to make decisions
+s2s list page-types --json
+# Returns: {"success": true, "data": {"items": [...], "count": 5}}
+
+# Step 6: Export specific types
+s2s export --types blog,product --json
+# Returns: {"success": true, "data": {"files": [...], "stats": {...}}}
+```
+
+### Remaining Work (Future Phases)
+
+- [ ] Add `--json` to remaining commands (lint, doctor, config, cleanup)
+- [ ] Add `--config-file` support for complex configurations
+- [ ] Environment variable support (S2S_API_KEY, etc.)
+- [ ] Non-interactive mode for `start` command
+- [ ] MCP server integration
+
+---
+
 ## Testing Plan
 
 1. **Unit tests** for JSON output formatting
