@@ -318,6 +318,10 @@ export const startCommand = new Command('start')
           aiAnalysis = await aiAnalyzer.analyzeSite(pages, pageTypes, workspace.getPath());
           await workspace.saveJSON('aiAnalysis.json', aiAnalysis);
 
+          logger.succeedSpinner(
+            `AI found ${aiAnalysis.detectedBlocks.length} blocks, enhanced ${aiAnalysis.enhancedObjects.length} objects`
+          );
+
           // Re-run object detection with AI validation
           logger.startSpinner('Re-validating detected objects with AI...');
           const aiValidatedAnalyzer = new Analyzer(pages, aiAnalyzer);
@@ -327,10 +331,6 @@ export const startCommand = new Command('start')
           detectedObjects = aiValidatedObjects;
           await workspace.saveJSON('objects.json', detectedObjects);
           logger.succeedSpinner('Object detection validated with AI');
-
-          logger.succeedSpinner(
-            `AI found ${aiAnalysis.detectedBlocks.length} blocks, enhanced ${aiAnalysis.enhancedObjects.length} objects`
-          );
 
           // Merge AI-enhanced objects with detected objects
           if (aiAnalysis.enhancedObjects.length > 0) {
