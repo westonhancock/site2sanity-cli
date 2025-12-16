@@ -6,7 +6,7 @@ import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
 import puppeteer, { Browser, Page as PuppeteerPage } from 'puppeteer';
 import { CrawlConfig, Page, PageMeta, Heading, Link } from '../../types';
-import { normalizeUrl, isSameOrigin, urlToId, generateContentHash, getUrlDepth, matchesPathPattern, isAllowedSubdomain } from '../../utils/url';
+import { normalizeUrl, isSameOrigin, urlToId, generateContentHash, getUrlDepth, matchesPathPattern, isAllowedSubdomain, getUrlDedupKey } from '../../utils/url';
 import { CrawlDatabase } from '../../utils/database';
 import PQueue from 'p-queue';
 import { logger } from '../../utils/logger';
@@ -54,8 +54,8 @@ export class Crawler {
         logger.info('Launched headless browser for rendered crawling');
       }
 
-      // Add base URL to queue
-      this.queued.add(this.baseUrl);
+      // Add base URL to queue (use dedup key to prevent query param variations)
+      this.queued.add(getUrlDedupKey(this.baseUrl));
       this.toVisit.push({ url: this.baseUrl, depth: 0 });
 
       let crawled = 0;
@@ -146,9 +146,10 @@ export class Crawler {
    */
   private async crawlPage(url: string, depth: number): Promise<void> {
     const normalizedUrl = normalizeUrl(url);
+    const dedupKey = getUrlDedupKey(normalizedUrl);
 
-    // Skip if already visited or exceeds depth
-    if (this.visited.has(normalizedUrl) || depth > this.config.maxDepth) {
+    // Skip if already visited (by dedup key to catch query param variations) or exceeds depth
+    if (this.visited.has(dedupKey) || depth > this.config.maxDepth) {
       return;
     }
 
@@ -157,7 +158,7 @@ export class Crawler {
       return;
     }
 
-    this.visited.add(normalizedUrl);
+    this.visited.add(dedupKey);
 
     // Retry logic for transient errors
     let lastError: Error | null = null;
@@ -177,14 +178,15 @@ export class Crawler {
           const newLinks = page.links
             .filter(link => isSameOrigin(link.href, this.baseUrl, this.config.followSubdomains))
             .filter(link => isAllowedSubdomain(link.href, this.baseUrl, this.config.allowedSubdomains))
-            .filter(link => !this.visited.has(normalizeUrl(link.href)))
-            .filter(link => !this.queued.has(normalizeUrl(link.href)))
+            .filter(link => !this.visited.has(getUrlDedupKey(link.href)))
+            .filter(link => !this.queued.has(getUrlDedupKey(link.href)))
             .filter(link => !this.shouldExclude(normalizeUrl(link.href)));
 
           for (const link of newLinks) {
             const normalizedLink = normalizeUrl(link.href);
-            if (!this.queued.has(normalizedLink)) {
-              this.queued.add(normalizedLink);
+            const linkDedupKey = getUrlDedupKey(normalizedLink);
+            if (!this.queued.has(linkDedupKey)) {
+              this.queued.add(linkDedupKey);
               this.toVisit.push({ url: normalizedLink, depth: depth + 1 });
             }
           }
