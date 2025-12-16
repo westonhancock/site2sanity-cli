@@ -27,9 +27,40 @@ import { listCommand } from './commands/list';
 
 const program = new Command();
 
+const description = `Interactive CLI: crawl websites and generate Sanity CMS schemas
+
+HUMAN USERS:
+  Run 's2s <url>' for the interactive workflow that guides you through
+  crawling, analysis, and schema generation.
+
+AI AGENTS (Claude Code, Cursor, Copilot, etc.):
+  Use individual commands with --json flag for structured output:
+
+  RECOMMENDED WORKFLOW:
+    1. s2s init <url>                    # Initialize workspace
+    2. s2s crawl --json                  # Crawl site, get stats
+    3. s2s analyze --json                # Detect page types
+    4. s2s status --json                 # Check progress
+    5. s2s list page-types --json        # Inspect detected types
+    6. s2s export --types a,b --json     # Export specific types
+
+  JSON OUTPUT FORMAT:
+    Success: {"success": true, "data": {...}}
+    Error:   {"success": false, "error": {"code": "...", "suggestion": "..."}}
+
+  COMMANDS WITH --json SUPPORT:
+    crawl, analyze, export, status, list
+
+  QUERY COMMANDS (for inspecting state):
+    s2s status --json                    # Workspace phase status
+    s2s list page-types --json           # Detected page types
+    s2s list objects --json              # Detected objects
+    s2s list blocks --json               # AI-detected blocks
+    s2s list documents --json            # Schema model contents`;
+
 program
   .name('s2s')
-  .description('Interactive CLI: two-phase website crawling with AI vision analysis to generate Sanity CMS schemas\n\nFor AI agents: use --json flag on individual commands for structured output')
+  .description(description)
   .version('0.1.0');
 
 // Primary interactive command

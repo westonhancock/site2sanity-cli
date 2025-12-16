@@ -20,7 +20,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 export const exportCommand = new Command('export')
-  .description('Export Sanity schema and migration artifacts')
+  .description('Export Sanity schema files (supports --json, --types, --exclude-types for AI agents)')
   .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
   .option('-o, --out <directory>', 'Output directory', 'out')
   .option('--types <types>', 'Comma-separated list of document types to include')
