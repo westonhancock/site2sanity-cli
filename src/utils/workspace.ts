@@ -49,7 +49,9 @@ export class Workspace {
         maxDepth: 10,
         include: [],
         exclude: [],
+        excludePaths: [], // Glob patterns for paths to exclude (e.g., '/admin/*', '/api/*')
         followSubdomains: false,
+        allowedSubdomains: [], // Specific subdomains to follow (empty = all)
         render: false,
         screenshot: 'none',
         screenshotSamplesPerType: 3, // Take 3 representative screenshots per page type

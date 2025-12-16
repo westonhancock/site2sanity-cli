@@ -232,3 +232,138 @@ export function matchesPattern(url: string, pattern: string): boolean {
 export function generateContentHash(content: string): string {
   return crypto.createHash('md5').update(content).digest('hex');
 }
+
+/**
+ * Check if URL path matches any glob pattern
+ * Supports patterns like '/admin/*', '/api/**', '*.json', etc.
+ */
+export function matchesPathPattern(url: string, patterns: string[]): boolean {
+  if (!patterns || patterns.length === 0) {
+    return false;
+  }
+
+  try {
+    const parsed = new URLParse(url);
+    const pathname = parsed.pathname || '/';
+
+    for (const pattern of patterns) {
+      if (globMatch(pathname, pattern)) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Simple glob pattern matcher
+ * Supports: * (single segment), ** (any segments), ? (single char)
+ */
+function globMatch(path: string, pattern: string): boolean {
+  // Escape regex special chars except * and ?
+  let regexPattern = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    // ** matches any path segments (including /)
+    .replace(/\*\*/g, '§§DOUBLESTAR§§')
+    // * matches anything except /
+    .replace(/\*/g, '[^/]*')
+    // Restore ** as .*
+    .replace(/§§DOUBLESTAR§§/g, '.*')
+    // ? matches single char except /
+    .replace(/\?/g, '[^/]');
+
+  // Ensure pattern matches the full path or starts from beginning
+  if (!regexPattern.startsWith('/') && !regexPattern.startsWith('.*')) {
+    regexPattern = '(^|/)' + regexPattern;
+  }
+
+  const regex = new RegExp('^' + regexPattern + '(/.*)?$', 'i');
+  return regex.test(path);
+}
+
+/**
+ * Extract subdomain from URL relative to base URL
+ * e.g., "blog.example.com" with base "example.com" -> "blog"
+ * e.g., "docs.blog.example.com" with base "example.com" -> "docs.blog"
+ */
+export function getSubdomain(url: string, baseUrl: string): string | null {
+  try {
+    const parsed = new URLParse(normalizeUrl(url));
+    const baseParsed = new URLParse(normalizeUrl(baseUrl));
+
+    const hostname = parsed.hostname.toLowerCase();
+    const baseHostname = baseParsed.hostname.toLowerCase();
+
+    // Get root domain of base
+    const baseRoot = getRootDomain(baseHostname);
+
+    // If the URL hostname ends with the base root domain, extract subdomain
+    if (hostname.endsWith(baseRoot)) {
+      const prefix = hostname.slice(0, hostname.length - baseRoot.length);
+      if (prefix.endsWith('.')) {
+        return prefix.slice(0, -1); // Remove trailing dot
+      }
+      if (prefix === '') {
+        return null; // Same domain, no subdomain
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if URL's subdomain is in the allowed list
+ * Returns true if:
+ * - allowedSubdomains is empty/undefined (all subdomains allowed)
+ * - URL is the exact base domain (no subdomain)
+ * - URL's subdomain is in the allowed list
+ */
+export function isAllowedSubdomain(url: string, baseUrl: string, allowedSubdomains?: string[]): boolean {
+  // If no allowlist specified, all subdomains are allowed
+  if (!allowedSubdomains || allowedSubdomains.length === 0) {
+    return true;
+  }
+
+  const subdomain = getSubdomain(url, baseUrl);
+
+  // If no subdomain (same domain as base), always allowed
+  if (subdomain === null) {
+    return true;
+  }
+
+  // Check if subdomain matches any in the allowed list
+  // Support both "blog" and "blog.example.com" formats
+  const normalizedSubdomain = subdomain.toLowerCase();
+
+  for (const allowed of allowedSubdomains) {
+    const normalizedAllowed = allowed.toLowerCase().replace(/\.$/, '');
+
+    // Direct match (e.g., "blog" matches "blog")
+    if (normalizedSubdomain === normalizedAllowed) {
+      return true;
+    }
+
+    // If allowed contains dots, check if it ends with allowed
+    // e.g., subdomain "docs.blog" matches allowed "blog"
+    if (normalizedSubdomain.endsWith('.' + normalizedAllowed)) {
+      return true;
+    }
+
+    // If allowed is full hostname format (blog.example.com), extract and compare
+    if (normalizedAllowed.includes('.')) {
+      const allowedParts = normalizedAllowed.split('.');
+      // Take everything before the root domain
+      const allowedSubdomainPart = allowedParts.slice(0, -2).join('.');
+      if (allowedSubdomainPart && normalizedSubdomain === allowedSubdomainPart) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
