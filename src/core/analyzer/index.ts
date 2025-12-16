@@ -3,7 +3,7 @@
  */
 
 import { Page, NavigationStructure, PageType, Relationship, NavItem, BreadcrumbPattern, SiteGraph, GraphNode, GraphEdge, PageFeatures, DetectedObject } from '../../types';
-import { extractUrlPattern, getPathSegments, normalizeUrl } from '../../utils/url';
+import { extractUrlPattern, getPathSegments, normalizeUrl, getUrlDedupKey } from '../../utils/url';
 import levenshtein from 'fast-levenshtein';
 import { ObjectDetector } from './objectDetector';
 import { AIAnalyzer } from './aiAnalyzer';
@@ -13,7 +13,19 @@ export class Analyzer {
   private aiAnalyzer?: AIAnalyzer;
 
   constructor(pages: Page[], aiAnalyzer?: AIAnalyzer) {
-    this.pages = pages.filter(p => p.status === 200);
+    // Filter to successful pages and deduplicate by canonical URL / dedup key
+    // This catches duplicate entries from query param variations
+    const successPages = pages.filter(p => p.status === 200);
+    const seenKeys = new Set<string>();
+    this.pages = successPages.filter(p => {
+      // Use canonical if available, otherwise fall back to dedup key (strips query params)
+      const dedupKey = p.canonical ? getUrlDedupKey(p.canonical) : getUrlDedupKey(p.url);
+      if (seenKeys.has(dedupKey)) {
+        return false;
+      }
+      seenKeys.add(dedupKey);
+      return true;
+    });
     this.aiAnalyzer = aiAnalyzer;
   }
 

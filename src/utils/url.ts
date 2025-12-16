@@ -234,6 +234,35 @@ export function generateContentHash(content: string): string {
 }
 
 /**
+ * Get URL deduplication key - strips query parameters for crawl deduplication
+ * This prevents URLs like /page?ref=nav and /page?utm_source=x from being crawled separately
+ */
+export function getUrlDedupKey(url: string): string {
+  try {
+    const parsed = new URLParse(url);
+
+    // Remove trailing slash except for root
+    let pathname = parsed.pathname || '/';
+    if (pathname !== '/' && pathname.endsWith('/')) {
+      pathname = pathname.slice(0, -1);
+    }
+
+    // Remove default ports
+    let port = parsed.port;
+    if ((parsed.protocol === 'http:' && port === '80') ||
+        (parsed.protocol === 'https:' && port === '443')) {
+      port = '';
+    }
+
+    // Return URL without query params or hash - just origin + path
+    const portPart = port ? `:${port}` : '';
+    return `${parsed.protocol}//${parsed.hostname}${portPart}${pathname}`;
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Check if URL path matches any glob pattern
  * Supports patterns like '/admin/*', '/api/**', '*.json', etc.
  */
