@@ -602,6 +602,7 @@ export class ObjectDetector {
 
   /**
    * Validate instances using AI if available
+   * Only uses AI if pre-AI confidence is below threshold (0.8)
    */
   private async validateInstances(
     instances: ContentObjectInstance[],
@@ -610,6 +611,23 @@ export class ObjectDetector {
     if (!this.aiAnalyzer || instances.length < 2) {
       return instances;
     }
+
+    // Calculate pre-AI confidence score
+    const preAIConfidence = this.calculatePreAIConfidence(instances);
+
+    // Skip AI validation if pre-AI confidence is high (>= 0.8)
+    const AI_CONFIDENCE_THRESHOLD = 0.8;
+    if (preAIConfidence >= AI_CONFIDENCE_THRESHOLD) {
+      logger.info(
+        `Skipping AI validation for ${typeName}: high pre-AI confidence (${preAIConfidence.toFixed(2)})`
+      );
+      return instances;
+    }
+
+    // Use AI validation for low-confidence cases
+    logger.info(
+      `Pre-AI confidence for ${typeName}: ${preAIConfidence.toFixed(2)} - using AI validation`
+    );
 
     try {
       logger.debug(`Validating ${instances.length} instances of ${typeName} using AI...`);
@@ -637,6 +655,101 @@ export class ObjectDetector {
     if (instanceCount >= 5) return 0.85;
     if (instanceCount >= 2) return 0.7;
     return 0.5;
+  }
+
+  /**
+   * Calculate pre-AI confidence score based on structural analysis
+   * Determines whether expensive AI validation is needed
+   */
+  private calculatePreAIConfidence(instances: ContentObjectInstance[]): number {
+    if (instances.length === 0) return 0;
+    if (instances.length === 1) return 1.0; // Single instance is inherently consistent
+
+    let score = 1.0; // Start at perfect confidence
+
+    // Factor 1: Source consistency (weight: 0.15)
+    const sources = new Set(instances.map(i => i.source));
+    if (sources.size > 1) {
+      // Multiple sources reduce confidence
+      const sourceConsistency = 1 - ((sources.size - 1) * 0.15);
+      score *= Math.max(0.5, sourceConsistency); // Penalty up to 50%
+    }
+
+    // Factor 2: Field structure consistency (weight: 0.30)
+    const fieldSets = instances.map(i => new Set(Object.keys(i.data)));
+
+    // Calculate Jaccard similarity between each pair of instances
+    let totalSimilarity = 0;
+    let comparisons = 0;
+
+    for (let i = 0; i < fieldSets.length; i++) {
+      for (let j = i + 1; j < fieldSets.length; j++) {
+        const intersection = new Set(
+          Array.from(fieldSets[i]).filter(x => fieldSets[j].has(x))
+        );
+        const union = new Set([...fieldSets[i], ...fieldSets[j]]);
+        totalSimilarity += intersection.size / union.size;
+        comparisons++;
+      }
+    }
+
+    const avgFieldSimilarity = comparisons > 0 ? totalSimilarity / comparisons : 1.0;
+    score *= avgFieldSimilarity;
+
+    // Factor 3: Field count variance (weight: 0.20)
+    const fieldCounts = instances.map(i => Object.keys(i.data).length);
+    const avgFieldCount = fieldCounts.reduce((a, b) => a + b, 0) / fieldCounts.length;
+    const variance = fieldCounts.reduce((sum, count) =>
+      sum + Math.pow(count - avgFieldCount, 2), 0) / fieldCounts.length;
+    const stddev = Math.sqrt(variance);
+    const coefficientOfVariation = avgFieldCount > 0 ? stddev / avgFieldCount : 0;
+
+    // High variance (CV > 0.5) significantly reduces confidence
+    const variancePenalty = Math.max(0, 1 - (coefficientOfVariation * 0.5));
+    score *= variancePenalty;
+
+    // Factor 4: Instance count bonus (weight: 0.15)
+    if (instances.length >= 10) {
+      score *= 1.05; // 5% bonus for high sample size
+    } else if (instances.length < 5) {
+      score *= 0.9; // 10% penalty for low sample size
+    }
+
+    // Factor 5: Data type consistency (weight: 0.20)
+    const typeConsistency = this.checkTypeConsistency(instances);
+    score *= typeConsistency;
+
+    return Math.max(0, Math.min(1.0, score));
+  }
+
+  /**
+   * Check type consistency across instances
+   * Returns ratio of fields with consistent types to total fields
+   */
+  private checkTypeConsistency(instances: ContentObjectInstance[]): number {
+    const fieldTypes = new Map<string, Set<string>>();
+
+    for (const instance of instances) {
+      for (const [key, value] of Object.entries(instance.data)) {
+        if (!fieldTypes.has(key)) {
+          fieldTypes.set(key, new Set());
+        }
+        fieldTypes.get(key)!.add(this.inferType(value));
+      }
+    }
+
+    // Calculate percentage of fields with consistent types
+    let consistentFields = 0;
+    let totalFields = 0;
+
+    for (const types of fieldTypes.values()) {
+      totalFields++;
+      if (types.size === 1) {
+        consistentFields++;
+      }
+    }
+
+    return totalFields > 0 ? consistentFields / totalFields : 1.0;
   }
 
   /**
