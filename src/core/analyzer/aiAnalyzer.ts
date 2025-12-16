@@ -138,8 +138,15 @@ export class AIAnalyzer {
 
       const message = await this.client.messages.create({
         model: this.config.model || 'claude-sonnet-4-5-20250929',
-        max_tokens: 8000,
-        system: 'You are a helpful assistant that analyzes websites and returns JSON-formatted responses. Always respond with valid JSON only, no additional text or explanations.',
+        max_tokens: 16000,
+        system: `You are a helpful assistant that analyzes websites and returns JSON-formatted responses.
+
+CRITICAL RULES:
+- Always respond with valid, complete JSON only
+- NO markdown formatting, NO explanations, NO text before or after the JSON
+- If running low on space, prioritize completing the JSON structure over adding more items
+- Close all arrays and objects properly
+- Ensure the response is valid JSON that can be parsed`,
         messages: [
           {
             role: 'user',
@@ -399,7 +406,10 @@ IMPORTANT:
 - Do NOT include explanations, commentary, or markdown formatting
 - The response should start with { and end with }
 - Ensure all JSON is valid and properly escaped
-- If you're unsure about any fields, include them anyway with best guesses`;
+- QUALITY OVER QUANTITY: Limit to top 5-10 most important items per category
+- Better to have fewer complete, high-quality items than many incomplete ones
+- ALWAYS close all arrays and objects properly - incomplete JSON will fail
+- If running out of space, stop adding items and close the JSON structure`;
   }
 
   /**
@@ -438,6 +448,9 @@ IMPORTANT:
         }
       }
 
+      // Try to repair truncated JSON
+      jsonText = this.repairTruncatedJSON(jsonText);
+
       // Try to parse the JSON
       const parsed = JSON.parse(jsonText);
 
@@ -464,6 +477,57 @@ IMPORTANT:
       logger.error(`Parse error: ${(error as Error).message}`);
       throw new Error('AI returned invalid JSON response');
     }
+  }
+
+  /**
+   * Attempt to repair truncated JSON by closing unclosed structures
+   */
+  private repairTruncatedJSON(jsonText: string): string {
+    let repaired = jsonText.trim();
+
+    // Count opening and closing brackets/braces
+    const openBraces = (repaired.match(/\{/g) || []).length;
+    const closeBraces = (repaired.match(/\}/g) || []).length;
+    const openBrackets = (repaired.match(/\[/g) || []).length;
+    const closeBrackets = (repaired.match(/\]/g) || []).length;
+
+    // If we have more opening than closing, try to close them
+    if (openBrackets > closeBrackets || openBraces > closeBraces) {
+      logger.debug('Detected truncated JSON, attempting repair...');
+
+      // Remove trailing incomplete content (likely cut off mid-field)
+      // Look for last complete field or last closing bracket/brace
+      const lastCompleteField = Math.max(
+        repaired.lastIndexOf('},'),
+        repaired.lastIndexOf('],'),
+        repaired.lastIndexOf('}'),
+        repaired.lastIndexOf(']')
+      );
+
+      if (lastCompleteField > 0) {
+        repaired = repaired.substring(0, lastCompleteField + 1);
+      }
+
+      // Re-count after trimming
+      const newOpenBrackets = (repaired.match(/\[/g) || []).length;
+      const newCloseBrackets = (repaired.match(/\]/g) || []).length;
+      const newOpenBraces = (repaired.match(/\{/g) || []).length;
+      const newCloseBraces = (repaired.match(/\}/g) || []).length;
+
+      // Close unclosed arrays
+      for (let i = 0; i < (newOpenBrackets - newCloseBrackets); i++) {
+        repaired += ']';
+      }
+
+      // Close unclosed objects
+      for (let i = 0; i < (newOpenBraces - newCloseBraces); i++) {
+        repaired += '}';
+      }
+
+      logger.debug('JSON repair attempted');
+    }
+
+    return repaired;
   }
 
   /**
