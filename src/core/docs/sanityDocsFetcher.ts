@@ -24,79 +24,311 @@ export class SanityDocsFetcher {
 
   /**
    * Fetch all common Sanity best practices documentation
+   * Currently uses hardcoded best practices for reliability
    */
   async fetchCommonPatterns(): Promise<SanityBestPractices> {
     if (!this.fetchEnabled) {
-      logger.debug('Context7 documentation fetching is disabled');
+      logger.debug('Documentation is disabled');
       return this.getEmptyPractices();
     }
 
-    try {
-      logger.info('Fetching latest Sanity documentation from Context7...');
+    logger.debug('Loading Sanity best practices...');
 
-      const [schemaTypes, validation, portableText, references, pageBuilder, fieldOptions] = await Promise.all([
-        this.fetchTopic('schema types and field definitions'),
-        this.fetchTopic('validation rules and constraints'),
-        this.fetchTopic('portable text and rich content'),
-        this.fetchTopic('references vs embedded content'),
-        this.fetchTopic('page builder patterns and flexible content'),
-        this.fetchTopic('field options and configuration'),
-      ]);
-
-      logger.success('Successfully fetched Sanity documentation');
-
-      return {
-        schemaTypes,
-        validation,
-        portableText,
-        references,
-        pageBuilder,
-        fieldOptions,
-      };
-    } catch (error) {
-      logger.warn(`Failed to fetch Sanity docs: ${(error as Error).message}`);
-      logger.warn('Continuing with built-in best practices...');
-      return this.getEmptyPractices();
-    }
+    return {
+      schemaTypes: this.getSchemaTypesDocs(),
+      validation: this.getValidationDocs(),
+      portableText: this.getPortableTextDocs(),
+      references: this.getReferencesDocs(),
+      pageBuilder: this.getPageBuilderDocs(),
+      fieldOptions: this.getFieldOptionsDocs(),
+    };
   }
 
   /**
-   * Fetch documentation for a specific topic
+   * Get schema types documentation
    */
-  private async fetchTopic(topic: string): Promise<string> {
-    // Check cache first
-    if (this.cache.has(topic)) {
-      logger.debug(`Using cached documentation for: ${topic}`);
-      return this.cache.get(topic)!;
-    }
+  private getSchemaTypesDocs(): string {
+    return `
+### Schema Type Best Practices
 
-    try {
-      // Note: This would normally call the Context7 MCP server
-      // For now, we'll simulate the call since we can't directly import MCP tools
-      // In production, this would use the MCP client library
-      logger.debug(`Fetching documentation for: ${topic}`);
+Use proper field types for your content:
+- **string**: Short text (titles, names, slugs)
+- **text**: Multi-line text without formatting
+- **portableText**: Rich text with formatting, headings, links (recommended for blog posts, articles)
+- **number**: Numeric values
+- **boolean**: True/false values
+- **datetime**: Dates and times
+- **url**: Web addresses
+- **image**: Images with metadata
+- **array**: Lists of items
+- **object**: Grouped fields
+- **reference**: Links to other documents
 
-      // Placeholder - will be replaced with actual MCP call
-      const docs = await this.callContext7MCP(topic);
+Example schema with defineField helpers:
+\`\`\`typescript
+import { defineType, defineField } from 'sanity'
 
-      // Cache the result
-      this.cache.set(topic, docs);
-
-      return docs;
-    } catch (error) {
-      logger.debug(`Failed to fetch topic "${topic}": ${(error as Error).message}`);
-      return '';
-    }
+export default defineType({
+  name: 'blogPost',
+  title: 'Blog Post',
+  type: 'document',
+  fields: [
+    defineField({
+      name: 'title',
+      title: 'Title',
+      type: 'string',
+      validation: Rule => Rule.required()
+    }),
+    defineField({
+      name: 'content',
+      title: 'Content',
+      type: 'portableText', // Use portableText for rich content
+    })
+  ]
+})
+\`\`\`
+`;
   }
 
   /**
-   * Call Context7 MCP server (placeholder for actual implementation)
-   * In production, this would use the @modelcontextprotocol/sdk
+   * Get validation documentation
    */
-  private async callContext7MCP(topic: string): Promise<string> {
-    // This is a placeholder - actual implementation would use MCP SDK
-    // For now, return empty string and we'll enhance this later
-    throw new Error('Context7 MCP integration requires MCP SDK setup');
+  private getValidationDocs(): string {
+    return `
+### Validation Best Practices
+
+Chain validation rules for robust data:
+
+\`\`\`typescript
+// String with length constraints
+{
+  name: 'title',
+  type: 'string',
+  validation: Rule => Rule.required().min(10).max(80)
+}
+
+// Email validation
+{
+  name: 'email',
+  type: 'string',
+  validation: Rule => Rule.required().email()
+}
+
+// Number range
+{
+  name: 'price',
+  type: 'number',
+  validation: Rule => Rule.required().min(0).max(10000)
+}
+
+// Custom validation
+{
+  name: 'slug',
+  type: 'slug',
+  validation: Rule => Rule.required().custom((value) => {
+    if (value?.current?.includes(' ')) {
+      return 'Slug cannot contain spaces'
+    }
+    return true
+  })
+}
+\`\`\`
+
+Common validation methods:
+- required(): Field must have a value
+- min(n): Minimum length/value
+- max(n): Maximum length/value
+- email(): Valid email format
+- url(): Valid URL format
+- custom(fn): Custom validation logic
+`;
+  }
+
+  /**
+   * Get Portable Text documentation
+   */
+  private getPortableTextDocs(): string {
+    return `
+### Portable Text Best Practices
+
+Use Portable Text for rich content instead of plain text fields:
+
+\`\`\`typescript
+{
+  name: 'content',
+  title: 'Content',
+  type: 'array',
+  of: [
+    {
+      type: 'block',
+      styles: [
+        {title: 'Normal', value: 'normal'},
+        {title: 'H2', value: 'h2'},
+        {title: 'H3', value: 'h3'},
+        {title: 'Quote', value: 'blockquote'}
+      ],
+      marks: {
+        decorators: [
+          {title: 'Strong', value: 'strong'},
+          {title: 'Emphasis', value: 'em'}
+        ],
+        annotations: [
+          {
+            name: 'link',
+            type: 'object',
+            title: 'URL',
+            fields: [{name: 'href', type: 'url', title: 'URL'}]
+          }
+        ]
+      }
+    },
+    {
+      type: 'image',
+      fields: [{name: 'alt', type: 'string', title: 'Alt text'}]
+    }
+  ]
+}
+\`\`\`
+
+**When to use Portable Text:**
+- Blog posts, articles, long-form content
+- Content that needs headings, lists, formatting
+- Content with embedded images or links
+- Any content >500 characters
+
+**When NOT to use Portable Text:**
+- Short titles, names, labels (use 'string')
+- Meta descriptions (use 'text')
+- Simple multi-line text without formatting (use 'text')
+`;
+  }
+
+  /**
+   * Get references documentation
+   */
+  private getReferencesDocs(): string {
+    return `
+### References vs Embedded Content
+
+**Use references when:**
+- Content is reused across multiple documents (authors, categories, tags)
+- Content needs to be managed separately
+- You want a single source of truth
+
+**Use embedded objects when:**
+- Content is specific to one document
+- Content is simple and won't be reused
+- Simplicity is more important than reusability
+
+Example reference:
+\`\`\`typescript
+{
+  name: 'author',
+  title: 'Author',
+  type: 'reference',
+  to: [{type: 'author'}],
+  validation: Rule => Rule.required()
+}
+\`\`\`
+
+Example embedded object:
+\`\`\`typescript
+{
+  name: 'seo',
+  title: 'SEO Settings',
+  type: 'object',
+  fields: [
+    {name: 'title', type: 'string'},
+    {name: 'description', type: 'text'}
+  ]
+}
+\`\`\`
+`;
+  }
+
+  /**
+   * Get page builder documentation
+   */
+  private getPageBuilderDocs(): string {
+    return `
+### Page Builder Patterns
+
+For flexible, component-based pages:
+
+\`\`\`typescript
+{
+  name: 'content',
+  title: 'Page Content',
+  type: 'array',
+  of: [
+    {type: 'hero'},
+    {type: 'features'},
+    {type: 'testimonials'},
+    {type: 'callToAction'},
+    {type: 'richText'}
+  ]
+}
+\`\`\`
+
+This allows editors to:
+- Build pages from reusable blocks
+- Reorder sections via drag-and-drop
+- Add/remove sections as needed
+- Create unique page layouts
+`;
+  }
+
+  /**
+   * Get field options documentation
+   */
+  private getFieldOptionsDocs(): string {
+    return `
+### Field Options Best Practices
+
+Add helpful options to improve editor experience:
+
+\`\`\`typescript
+// Slug with source
+{
+  name: 'slug',
+  type: 'slug',
+  options: {
+    source: 'title',
+    maxLength: 96
+  }
+}
+
+// Text with row count
+{
+  name: 'excerpt',
+  type: 'text',
+  options: {
+    rows: 4
+  }
+}
+
+// String with predefined list
+{
+  name: 'status',
+  type: 'string',
+  options: {
+    list: [
+      {title: 'Draft', value: 'draft'},
+      {title: 'Published', value: 'published'}
+    ]
+  }
+}
+
+// Image with hotspot
+{
+  name: 'image',
+  type: 'image',
+  options: {
+    hotspot: true
+  }
+}
+\`\`\`
+`;
   }
 
   /**

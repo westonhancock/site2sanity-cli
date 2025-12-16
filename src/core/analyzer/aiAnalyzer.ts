@@ -376,14 +376,20 @@ Please analyze this data and respond with a JSON object in this exact format:
 \`\`\`
 
 Focus on:
-- Sanity-appropriate field types (string, text, number, boolean, datetime, url, image, array, object, reference)
+- **Field Type Selection** (CRITICAL):
+  * Use 'portableText' for long-form content (blog posts, articles, content >500 chars)
+  * Use 'string' for short text (titles, names, labels <100 chars)
+  * Use 'text' for multi-line plain text without formatting (descriptions, excerpts)
+  * Use 'number', 'boolean', 'datetime', 'url', 'image' for specific data types
+  * Use 'reference' for reusable content (authors, categories, tags)
+  * Use 'object' for embedded grouped fields (SEO settings, metadata)
+  * Use 'array' for lists or flexible content builders
 - Identifying which fields should be references vs embedded
 - Finding repeating UI patterns that should be blocks
 - Practical, descriptive field names
 - Accurate field descriptions
 - Advanced validation rules (min, max, required, custom)
 - Field options (maxLength, rows, list, source, layout)
-- Portable Text for rich content (use array of block type instead of simple text)
 - Page builder patterns (flexible content arrays)
 
 ${this.getBestPracticesGuidance()}
