@@ -60,6 +60,554 @@ Transform site2sanity-cli from a CMS schema generator into a **complete website 
 
 ---
 
+## Tech Stack Selection
+
+### Goal
+Allow users to choose their preferred technologies for every layer of the frontend stack, ensuring the generated code matches their team's expertise and project requirements.
+
+### New Module: `src/core/frontend/techStack.ts`
+
+### Tech Stack Configuration Interface
+
+```typescript
+interface TechStackConfig {
+  // Core Framework
+  framework: FrameworkChoice;
+
+  // Styling
+  styling: StylingChoice;
+
+  // UI Components
+  uiLibrary: UILibraryChoice;
+
+  // Icons
+  iconLibrary: IconLibraryChoice;
+
+  // Animations
+  animation: AnimationChoice;
+
+  // Forms
+  forms: FormsChoice;
+
+  // State Management (if needed)
+  stateManagement: StateManagementChoice;
+
+  // Package Manager
+  packageManager: PackageManagerChoice;
+
+  // Deployment Target
+  deployment: DeploymentChoice;
+
+  // Additional Options
+  options: {
+    typescript: boolean;
+    eslint: boolean;
+    prettier: boolean;
+    testing: TestingChoice;
+    storybook: boolean;
+    i18n: I18nChoice;
+  };
+}
+```
+
+---
+
+### 1. Framework Choices
+
+| Framework | Description | Best For |
+|-----------|-------------|----------|
+| **Next.js (App Router)** | React framework with SSR/SSG | Full-featured web apps, SEO-critical sites |
+| **Next.js (Pages Router)** | React framework (legacy routing) | Teams familiar with pages directory |
+| **Astro** | Content-focused, multi-framework | Content sites, blogs, marketing pages |
+| **Remix** | React with nested routing | Data-heavy apps, complex forms |
+| **Nuxt** | Vue.js framework | Vue teams, full-stack Vue apps |
+| **SvelteKit** | Svelte framework | Performance-critical, smaller bundles |
+| **Gatsby** | React static site generator | Static marketing sites, blogs |
+
+```typescript
+type FrameworkChoice = {
+  name: 'nextjs-app' | 'nextjs-pages' | 'astro' | 'remix' | 'nuxt' | 'sveltekit' | 'gatsby';
+  version: string;  // e.g., "14", "4", "3"
+};
+```
+
+---
+
+### 2. Styling Choices
+
+| Styling | Description | Generates |
+|---------|-------------|-----------|
+| **Tailwind CSS** | Utility-first CSS | tailwind.config.ts, utility classes |
+| **CSS Modules** | Scoped CSS files | *.module.css files |
+| **styled-components** | CSS-in-JS (React) | Styled component definitions |
+| **Emotion** | CSS-in-JS (flexible) | @emotion/styled components |
+| **Sass/SCSS** | CSS preprocessor | *.scss files with variables |
+| **Vanilla CSS** | Plain CSS | Standard CSS files |
+| **UnoCSS** | Atomic CSS engine | uno.config.ts, utility classes |
+| **Panda CSS** | Type-safe CSS-in-JS | panda.config.ts, styled system |
+
+```typescript
+type StylingChoice = {
+  name: 'tailwind' | 'css-modules' | 'styled-components' | 'emotion' | 'scss' | 'vanilla' | 'unocss' | 'panda';
+  version: string;
+  config?: {
+    // Tailwind-specific
+    plugins?: ('forms' | 'typography' | 'aspect-ratio' | 'container-queries')[];
+    // General
+    cssVariables: boolean;
+    darkMode: 'class' | 'media' | false;
+  };
+};
+```
+
+---
+
+### 3. UI Component Library Choices
+
+| Library | Description | Framework | Best For |
+|---------|-------------|-----------|----------|
+| **shadcn/ui** | Copy-paste Radix components | React | Full customization, modern React |
+| **Radix UI** | Unstyled accessible primitives | React | Custom design systems |
+| **Headless UI** | Unstyled Tailwind components | React/Vue | Tailwind projects |
+| **Chakra UI** | Styled component library | React | Rapid prototyping |
+| **MUI (Material UI)** | Google Material Design | React | Enterprise apps |
+| **Mantine** | Full-featured React library | React | Feature-rich apps |
+| **Ant Design** | Enterprise UI library | React | Admin dashboards |
+| **DaisyUI** | Tailwind component library | Any | Quick Tailwind styling |
+| **Vuetify** | Material Design for Vue | Vue | Vue Material apps |
+| **PrimeVue** | Rich UI components | Vue | Enterprise Vue apps |
+| **Skeleton** | Svelte UI toolkit | Svelte | SvelteKit projects |
+| **None** | Custom components only | Any | Full control |
+
+```typescript
+type UILibraryChoice = {
+  name: 'shadcn' | 'radix' | 'headless-ui' | 'chakra' | 'mui' | 'mantine' | 'antd' | 'daisyui' | 'vuetify' | 'primevue' | 'skeleton' | 'none';
+  version: string;
+  components?: string[];  // Specific components to include (for shadcn)
+};
+```
+
+#### shadcn/ui Component Selection
+
+When shadcn/ui is selected, prompt for which components to install:
+
+```
+? Select shadcn/ui components to include:
+  ◉ Button
+  ◉ Card
+  ◉ Input
+  ◉ Dialog
+  ◉ Dropdown Menu
+  ◉ Navigation Menu
+  ◯ Data Table
+  ◯ Calendar
+  ◯ Carousel
+  ◯ Charts
+```
+
+---
+
+### 4. Icon Library Choices
+
+| Library | Icons | Style |
+|---------|-------|-------|
+| **Lucide** | 1400+ | Clean, consistent |
+| **Heroicons** | 300+ | Tailwind's official |
+| **Phosphor** | 7000+ | Flexible weights |
+| **Tabler** | 4500+ | Consistent stroke |
+| **Radix Icons** | 300+ | Minimal, accessible |
+| **Font Awesome** | 2000+ | Classic, recognizable |
+| **React Icons** | Multi-library | Collection of libraries |
+| **Iconify** | 150,000+ | Universal icon framework |
+
+```typescript
+type IconLibraryChoice = {
+  name: 'lucide' | 'heroicons' | 'phosphor' | 'tabler' | 'radix-icons' | 'fontawesome' | 'react-icons' | 'iconify' | 'none';
+};
+```
+
+---
+
+### 5. Animation Library Choices
+
+| Library | Description | Best For |
+|---------|-------------|----------|
+| **Framer Motion** | Declarative animations | React, complex animations |
+| **GSAP** | Professional-grade | Timeline animations, scroll |
+| **Motion One** | Lightweight, performant | Simple animations |
+| **AutoAnimate** | Automatic transitions | Quick wins, lists |
+| **Lottie** | After Effects animations | Complex illustrations |
+| **CSS Animations** | Native CSS | Simple transitions |
+| **None** | No animation library | Minimal bundle |
+
+```typescript
+type AnimationChoice = {
+  name: 'framer-motion' | 'gsap' | 'motion-one' | 'auto-animate' | 'lottie' | 'css' | 'none';
+};
+```
+
+---
+
+### 6. Form Handling Choices
+
+| Library | Description | Validation |
+|---------|-------------|------------|
+| **React Hook Form** | Performant, minimal re-renders | zod, yup, joi |
+| **Formik** | Battle-tested, declarative | yup, custom |
+| **TanStack Form** | Headless, type-safe | Built-in, zod |
+| **Conform** | Progressive enhancement | zod |
+| **Native Forms** | HTML forms only | HTML5 validation |
+| **VeeValidate** | Vue form validation | zod, yup |
+| **Superforms** | SvelteKit forms | zod |
+
+```typescript
+type FormsChoice = {
+  name: 'react-hook-form' | 'formik' | 'tanstack-form' | 'conform' | 'native' | 'vee-validate' | 'superforms';
+  validation: 'zod' | 'yup' | 'joi' | 'native' | 'none';
+};
+```
+
+---
+
+### 7. State Management Choices (Optional)
+
+| Library | Description | Best For |
+|---------|-------------|----------|
+| **None (React Context)** | Built-in React | Simple state |
+| **Zustand** | Minimal, hooks-based | Small-medium apps |
+| **Jotai** | Atomic state | Fine-grained reactivity |
+| **TanStack Query** | Server state | API data fetching |
+| **Redux Toolkit** | Predictable state | Large apps, time-travel |
+| **Pinia** | Vue store | Vue apps |
+| **Svelte Stores** | Built-in Svelte | SvelteKit apps |
+
+```typescript
+type StateManagementChoice = {
+  name: 'none' | 'zustand' | 'jotai' | 'tanstack-query' | 'redux-toolkit' | 'pinia' | 'svelte-stores';
+};
+```
+
+---
+
+### 8. Package Manager Choices
+
+| Manager | Description |
+|---------|-------------|
+| **npm** | Node.js default |
+| **yarn** | Facebook's alternative |
+| **pnpm** | Fast, disk-efficient |
+| **bun** | All-in-one toolkit |
+
+```typescript
+type PackageManagerChoice = 'npm' | 'yarn' | 'pnpm' | 'bun';
+```
+
+---
+
+### 9. Deployment Target Choices
+
+| Platform | Features | Config Generated |
+|----------|----------|-----------------|
+| **Vercel** | Next.js native, edge | vercel.json |
+| **Netlify** | JAMstack, forms | netlify.toml |
+| **Cloudflare Pages** | Edge, fast | wrangler.toml |
+| **AWS Amplify** | Full AWS integration | amplify.yml |
+| **Railway** | Simple deploys | railway.json |
+| **Docker** | Container-based | Dockerfile |
+| **Generic** | No platform-specific | None |
+
+```typescript
+type DeploymentChoice = {
+  name: 'vercel' | 'netlify' | 'cloudflare' | 'amplify' | 'railway' | 'docker' | 'generic';
+  config?: {
+    // Platform-specific options
+    edge?: boolean;
+    serverless?: boolean;
+    static?: boolean;
+  };
+};
+```
+
+---
+
+### 10. Testing Choices
+
+| Framework | Description |
+|-----------|-------------|
+| **Vitest** | Fast, Vite-native |
+| **Jest** | Industry standard |
+| **Playwright** | E2E, cross-browser |
+| **Cypress** | E2E, component testing |
+| **Testing Library** | Component testing |
+| **None** | Skip testing setup |
+
+```typescript
+type TestingChoice = {
+  unit: 'vitest' | 'jest' | 'none';
+  e2e: 'playwright' | 'cypress' | 'none';
+  component: 'testing-library' | 'none';
+};
+```
+
+---
+
+### 11. Internationalization (i18n) Choices
+
+| Library | Framework |
+|---------|-----------|
+| **next-intl** | Next.js |
+| **react-i18next** | React |
+| **vue-i18n** | Vue/Nuxt |
+| **Paraglide** | Any (Inlang) |
+| **None** | Single language |
+
+```typescript
+type I18nChoice = {
+  name: 'next-intl' | 'react-i18next' | 'vue-i18n' | 'paraglide' | 'none';
+  defaultLocale?: string;
+  locales?: string[];
+};
+```
+
+---
+
+### Interactive Tech Stack Selection Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    TECH STACK CONFIGURATION                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ? Select your framework:                                        │
+│    ❯ Next.js (App Router)    - React with SSR/SSG               │
+│      Next.js (Pages Router)  - Legacy Next.js routing           │
+│      Astro                   - Content-focused, islands         │
+│      Remix                   - Full-stack React                 │
+│      Nuxt                    - Vue.js framework                 │
+│      SvelteKit               - Svelte framework                 │
+│                                                                  │
+│  ? Select styling approach:                                      │
+│    ❯ Tailwind CSS            - Utility-first CSS                │
+│      shadcn/ui + Tailwind    - Pre-built components             │
+│      CSS Modules             - Scoped CSS files                 │
+│      styled-components       - CSS-in-JS                        │
+│      Sass/SCSS               - CSS preprocessor                 │
+│                                                                  │
+│  ? Select UI component library:                                  │
+│    ❯ shadcn/ui               - Customizable Radix components    │
+│      Radix UI (unstyled)     - Accessible primitives            │
+│      Headless UI             - Tailwind Labs components         │
+│      Chakra UI               - Styled component library         │
+│      None                    - Custom components only           │
+│                                                                  │
+│  ? Select icon library:                                          │
+│    ❯ Lucide                  - Clean, consistent (recommended)  │
+│      Heroicons               - Tailwind's official icons        │
+│      Phosphor                - Flexible icon weights            │
+│                                                                  │
+│  ? Select animation library:                                     │
+│    ❯ Framer Motion           - Declarative animations           │
+│      CSS Only                - Native CSS transitions           │
+│      None                    - No animations                    │
+│                                                                  │
+│  ? Select form handling:                                         │
+│    ❯ React Hook Form + Zod   - Performant with validation       │
+│      Native HTML Forms       - Simple HTML5 forms               │
+│                                                                  │
+│  ? Select package manager:                                       │
+│    ❯ pnpm                    - Fast, disk-efficient             │
+│      npm                     - Node.js default                  │
+│      yarn                    - Classic alternative              │
+│      bun                     - All-in-one runtime               │
+│                                                                  │
+│  ? Select deployment target:                                     │
+│    ❯ Vercel                  - Best for Next.js                 │
+│      Netlify                 - Great for static/JAMstack        │
+│      Docker                  - Container-based                  │
+│      Generic                 - No platform config               │
+│                                                                  │
+│  ? Additional options:                                           │
+│    ◉ TypeScript                                                  │
+│    ◉ ESLint + Prettier                                          │
+│    ◯ Storybook                                                   │
+│    ◯ Unit Tests (Vitest)                                         │
+│    ◯ E2E Tests (Playwright)                                      │
+│    ◯ Internationalization (i18n)                                 │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Preset Configurations
+
+Offer quick-start presets for common combinations:
+
+```typescript
+const presets: Record<string, Partial<TechStackConfig>> = {
+  'modern-react': {
+    framework: { name: 'nextjs-app', version: '14' },
+    styling: { name: 'tailwind', version: '3' },
+    uiLibrary: { name: 'shadcn' },
+    iconLibrary: { name: 'lucide' },
+    animation: { name: 'framer-motion' },
+    forms: { name: 'react-hook-form', validation: 'zod' },
+    packageManager: 'pnpm',
+    deployment: { name: 'vercel' },
+  },
+
+  'minimal': {
+    framework: { name: 'astro', version: '4' },
+    styling: { name: 'tailwind', version: '3' },
+    uiLibrary: { name: 'none' },
+    iconLibrary: { name: 'lucide' },
+    animation: { name: 'css' },
+    forms: { name: 'native', validation: 'native' },
+    packageManager: 'npm',
+    deployment: { name: 'netlify' },
+  },
+
+  'enterprise': {
+    framework: { name: 'nextjs-app', version: '14' },
+    styling: { name: 'tailwind', version: '3' },
+    uiLibrary: { name: 'shadcn' },
+    iconLibrary: { name: 'lucide' },
+    animation: { name: 'framer-motion' },
+    forms: { name: 'react-hook-form', validation: 'zod' },
+    stateManagement: { name: 'tanstack-query' },
+    packageManager: 'pnpm',
+    deployment: { name: 'vercel' },
+    options: {
+      typescript: true,
+      eslint: true,
+      prettier: true,
+      testing: { unit: 'vitest', e2e: 'playwright', component: 'testing-library' },
+      storybook: true,
+      i18n: { name: 'next-intl' },
+    },
+  },
+
+  'vue': {
+    framework: { name: 'nuxt', version: '3' },
+    styling: { name: 'tailwind', version: '3' },
+    uiLibrary: { name: 'headless-ui' },
+    iconLibrary: { name: 'heroicons' },
+    animation: { name: 'css' },
+    forms: { name: 'vee-validate', validation: 'zod' },
+    stateManagement: { name: 'pinia' },
+    packageManager: 'pnpm',
+    deployment: { name: 'vercel' },
+  },
+
+  'svelte': {
+    framework: { name: 'sveltekit', version: '2' },
+    styling: { name: 'tailwind', version: '3' },
+    uiLibrary: { name: 'skeleton' },
+    iconLibrary: { name: 'lucide' },
+    animation: { name: 'css' },
+    forms: { name: 'superforms', validation: 'zod' },
+    stateManagement: { name: 'svelte-stores' },
+    packageManager: 'pnpm',
+    deployment: { name: 'vercel' },
+  },
+};
+```
+
+---
+
+### CLI Command Integration
+
+```bash
+# Interactive selection
+s2s frontend
+
+# Use preset
+s2s frontend --preset=modern-react
+
+# Specify individual options
+s2s frontend --framework=nextjs --ui=shadcn --styling=tailwind
+
+# Full custom configuration
+s2s frontend \
+  --framework=nextjs-app \
+  --styling=tailwind \
+  --ui=shadcn \
+  --icons=lucide \
+  --animation=framer-motion \
+  --forms=react-hook-form \
+  --validation=zod \
+  --package-manager=pnpm \
+  --deploy=vercel \
+  --typescript \
+  --eslint \
+  --prettier
+```
+
+---
+
+### Compatibility Matrix
+
+Not all combinations work together. The system validates choices:
+
+```typescript
+const compatibilityRules: CompatibilityRule[] = [
+  // Framework-specific UI libraries
+  { if: { framework: 'nuxt' }, then: { uiLibrary: ['headless-ui', 'vuetify', 'primevue', 'none'] } },
+  { if: { framework: 'sveltekit' }, then: { uiLibrary: ['skeleton', 'none'] } },
+
+  // Styling compatibility
+  { if: { uiLibrary: 'chakra' }, then: { styling: ['emotion', 'styled-components'] } },
+  { if: { uiLibrary: 'shadcn' }, then: { styling: ['tailwind'] } },
+  { if: { uiLibrary: 'daisyui' }, then: { styling: ['tailwind'] } },
+
+  // Form libraries per framework
+  { if: { framework: 'nuxt' }, then: { forms: ['vee-validate', 'native'] } },
+  { if: { framework: 'sveltekit' }, then: { forms: ['superforms', 'native'] } },
+
+  // State management per framework
+  { if: { framework: 'nuxt' }, then: { stateManagement: ['pinia', 'none'] } },
+  { if: { framework: 'sveltekit' }, then: { stateManagement: ['svelte-stores', 'none'] } },
+];
+```
+
+---
+
+### Generated Dependencies Example
+
+For `modern-react` preset, `package.json` includes:
+
+```json
+{
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@sanity/client": "^6.0.0",
+    "@sanity/image-url": "^1.0.0",
+    "@portabletext/react": "^3.0.0",
+    "lucide-react": "^0.300.0",
+    "framer-motion": "^10.0.0",
+    "react-hook-form": "^7.0.0",
+    "@hookform/resolvers": "^3.0.0",
+    "zod": "^3.22.0",
+    "clsx": "^2.0.0",
+    "tailwind-merge": "^2.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0",
+    "@types/react": "^18.2.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.0"
+  }
+}
+```
+
+---
+
 ## Phase 1: Design System Extraction
 
 ### Goal
