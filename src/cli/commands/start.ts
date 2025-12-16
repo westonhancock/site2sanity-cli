@@ -251,6 +251,9 @@ export const startCommand = new Command('start')
             useVision: hasScreenshots,
           });
 
+          // Initialize AI analyzer with latest Sanity documentation
+          await aiAnalyzer.initialize();
+
           aiAnalysis = await aiAnalyzer.analyzeSite(pages, pageTypes, workspace.getPath());
           await workspace.saveJSON('aiAnalysis.json', aiAnalysis);
 

@@ -13,6 +13,7 @@ import {
   ContentObjectInstance,
 } from '../../types';
 import { logger } from '../../utils/logger';
+import { SanityDocsFetcher, SanityBestPractices } from '../docs/sanityDocsFetcher';
 
 export interface AIAnalysisResult {
   enhancedPageTypes: Array<{
@@ -55,6 +56,8 @@ export interface AIAnalysisResult {
 export class AIAnalyzer {
   private client: Anthropic;
   private config: AIConfig;
+  private docsFetcher: SanityDocsFetcher;
+  private sanityBestPractices?: SanityBestPractices;
 
   constructor(config: AIConfig) {
     if (!config.apiKey) {
@@ -65,6 +68,22 @@ export class AIAnalyzer {
       apiKey: config.apiKey,
     });
     this.config = config;
+    this.docsFetcher = new SanityDocsFetcher(true);
+  }
+
+  /**
+   * Initialize by fetching latest Sanity documentation
+   */
+  async initialize(): Promise<void> {
+    try {
+      this.sanityBestPractices = await this.docsFetcher.fetchCommonPatterns();
+      if (this.sanityBestPractices.schemaTypes) {
+        logger.debug('Loaded Sanity best practices documentation');
+      }
+    } catch (error) {
+      logger.debug(`Could not load Sanity docs: ${(error as Error).message}`);
+      // Continue without docs - not a fatal error
+    }
   }
 
   /**
@@ -362,6 +381,12 @@ Focus on:
 - Finding repeating UI patterns that should be blocks
 - Practical, descriptive field names
 - Accurate field descriptions
+- Advanced validation rules (min, max, required, custom)
+- Field options (maxLength, rows, list, source, layout)
+- Portable Text for rich content (use array of block type instead of simple text)
+- Page builder patterns (flexible content arrays)
+
+${this.getBestPracticesGuidance()}
 
 IMPORTANT:
 - Return ONLY the JSON object with no additional text before or after
@@ -369,6 +394,17 @@ IMPORTANT:
 - The response should start with { and end with }
 - Ensure all JSON is valid and properly escaped
 - If you're unsure about any fields, include them anyway with best guesses`;
+  }
+
+  /**
+   * Get best practices guidance from fetched documentation
+   */
+  private getBestPracticesGuidance(): string {
+    if (!this.sanityBestPractices) {
+      return '';
+    }
+
+    return this.docsFetcher.formatForAIPrompt(this.sanityBestPractices);
   }
 
   /**

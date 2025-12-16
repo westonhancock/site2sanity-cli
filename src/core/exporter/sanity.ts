@@ -191,7 +191,7 @@ ${fields}
   private generateFields(fields: SanityField[], indent: string = '    '): string {
     return fields.map(field => {
       const options = field.options ? `,\n${indent}  options: ${JSON.stringify(field.options, null, 2).split('\n').join(`\n${indent}  `)}` : '';
-      const validation = field.validation ? `,\n${indent}  validation: (Rule) => Rule.${field.validation}()` : '';
+      const validation = this.generateValidation(field, indent);
       const description = field.description ? `,\n${indent}  description: '${field.description}'` : '';
 
       // Handle nested object fields
@@ -222,6 +222,42 @@ ${indent}  title: '${field.title}',
 ${indent}  type: '${field.type}'${options}${validation}${description}${nestedFields}${of}${to}
 ${indent}})`;
     }).join(',\n');
+  }
+
+  /**
+   * Generate validation rules
+   */
+  private generateValidation(field: SanityField, indent: string): string {
+    if (!field.validation) {
+      return '';
+    }
+
+    // If validation is a string, use simple pattern
+    if (typeof field.validation === 'string') {
+      return `,\n${indent}  validation: (Rule) => Rule.${field.validation}()`;
+    }
+
+    // If validation is an object with rule properties
+    if (typeof field.validation === 'object') {
+      const rules: string[] = [];
+
+      // Handle common validation rules
+      if (field.validation.required) rules.push('required()');
+      if (field.validation.min !== undefined) rules.push(`min(${field.validation.min})`);
+      if (field.validation.max !== undefined) rules.push(`max(${field.validation.max})`);
+      if (field.validation.email) rules.push('email()');
+      if (field.validation.url) rules.push('url()');
+      if (field.validation.length !== undefined) rules.push(`length(${field.validation.length})`);
+      if (field.validation.custom) {
+        rules.push(`custom((value) => ${field.validation.custom})`);
+      }
+
+      if (rules.length > 0) {
+        return `,\n${indent}  validation: (Rule) => Rule.${rules.join('.')}`;
+      }
+    }
+
+    return '';
   }
 
   /**
@@ -324,6 +360,67 @@ export default defineType({
 })
 `;
     fs.writeFileSync(path.join(objDir, 'link.ts'), linkObject);
+
+    // Portable Text object (for rich content)
+    const portableTextObject = `import { defineType, defineArrayMember } from 'sanity'
+
+export default defineType({
+  name: 'portableText',
+  title: 'Rich Text',
+  type: 'array',
+  description: 'Rich text content with formatting, links, and embeds',
+  of: [
+    defineArrayMember({
+      type: 'block',
+      styles: [
+        {title: 'Normal', value: 'normal'},
+        {title: 'H1', value: 'h1'},
+        {title: 'H2', value: 'h2'},
+        {title: 'H3', value: 'h3'},
+        {title: 'H4', value: 'h4'},
+        {title: 'Quote', value: 'blockquote'},
+      ],
+      lists: [
+        {title: 'Bullet', value: 'bullet'},
+        {title: 'Numbered', value: 'number'}
+      ],
+      marks: {
+        decorators: [
+          {title: 'Strong', value: 'strong'},
+          {title: 'Emphasis', value: 'em'},
+          {title: 'Code', value: 'code'}
+        ],
+        annotations: [
+          {
+            name: 'link',
+            type: 'object',
+            title: 'External Link',
+            fields: [
+              {
+                name: 'href',
+                type: 'url',
+                title: 'URL'
+              }
+            ]
+          }
+        ]
+      }
+    }),
+    defineArrayMember({
+      type: 'image',
+      fields: [
+        {
+          name: 'alt',
+          type: 'string',
+          title: 'Alternative text',
+          description: 'Important for SEO and accessibility'
+        }
+      ]
+    })
+  ]
+})
+`;
+    fs.writeFileSync(path.join(objDir, 'portableText.ts'), portableTextObject);
   }
 
   /**
@@ -354,7 +451,8 @@ export default defineType({
     // Common objects
     imports.push(`import seo from './objects/seo'`);
     imports.push(`import link from './objects/link'`);
-    exports.push('seo', 'link');
+    imports.push(`import portableText from './objects/portableText'`);
+    exports.push('seo', 'link', 'portableText');
 
     return `${imports.join('\n')}
 
