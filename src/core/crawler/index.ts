@@ -17,6 +17,7 @@ export class Crawler {
   private db: CrawlDatabase;
   private queue: PQueue;
   private visited: Set<string>;
+  private queued: Set<string>; // Track URLs already in queue to prevent duplicates
   private toVisit: Array<{ url: string; depth: number }>;
   private browser: Browser | null = null;
 
@@ -26,6 +27,7 @@ export class Crawler {
     this.db = db;
     this.queue = new PQueue({ concurrency: config.concurrency });
     this.visited = new Set();
+    this.queued = new Set(); // Initialize queued URL tracker
     this.toVisit = [];
   }
 
@@ -53,6 +55,7 @@ export class Crawler {
       }
 
       // Add base URL to queue
+      this.queued.add(this.baseUrl);
       this.toVisit.push({ url: this.baseUrl, depth: 0 });
 
       let crawled = 0;
@@ -174,11 +177,13 @@ export class Crawler {
           const newLinks = page.links
             .filter(link => isSameOrigin(link.href, this.baseUrl, this.config.followSubdomains))
             .filter(link => !this.visited.has(normalizeUrl(link.href)))
+            .filter(link => !this.queued.has(normalizeUrl(link.href)))
             .filter(link => !this.shouldExclude(normalizeUrl(link.href)));
 
           for (const link of newLinks) {
             const normalizedLink = normalizeUrl(link.href);
-            if (!this.toVisit.some(item => item.url === normalizedLink)) {
+            if (!this.queued.has(normalizedLink)) {
+              this.queued.add(normalizedLink);
               this.toVisit.push({ url: normalizedLink, depth: depth + 1 });
             }
           }
