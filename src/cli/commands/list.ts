@@ -20,8 +20,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export const listCommand = new Command('list')
-  .description('List detected page types, objects, blocks, or documents')
-  .argument('<type>', 'What to list: page-types, objects, blocks, documents')
+  .description('[AI] Query detected content: page-types, objects, blocks, or documents')
+  .argument('<type>', 'page-types | objects | blocks | documents')
   .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
   .option('--json', 'Output results as JSON (for AI agents)')
   .option('--verbose', 'Include full details for each item')

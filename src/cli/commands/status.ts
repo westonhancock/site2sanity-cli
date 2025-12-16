@@ -19,7 +19,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export const statusCommand = new Command('status')
-  .description('Show workspace status (useful for AI agents to understand current state)')
+  .description('[AI] Check workspace status: which phases are complete, counts, etc.')
   .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
   .option('--json', 'Output results as JSON (for AI agents)')
   .action(async (options: any) => {

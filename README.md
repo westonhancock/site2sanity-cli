@@ -88,6 +88,127 @@ s2s export                       # Export files
 s2s report                       # View report
 ```
 
+---
+
+## For AI Agents (Claude Code, Cursor, etc.)
+
+This CLI supports a **non-interactive JSON mode** designed for AI agents. Use the `--json` flag on commands to get structured, parseable output instead of human-formatted text.
+
+### Quick Reference for AI Agents
+
+```bash
+# Initialize a workspace (still interactive, but one-time setup)
+s2s init https://example.com
+
+# Crawl with JSON output - returns structured stats
+s2s crawl --max-pages 50 --json
+
+# Analyze with JSON output - returns page types, objects, relationships
+s2s analyze --json
+
+# Check workspace status - see what phases are complete
+s2s status --json
+
+# List detected content (page-types | objects | blocks | documents)
+s2s list page-types --json
+s2s list objects --json
+
+# Export with filtering - only export specific types
+s2s export --types blog,product --json
+s2s export --exclude-types 404,search --json
+```
+
+### JSON Response Format
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "workspace": ".site2sanity",
+    "stats": { ... },
+    "pageTypes": [ ... ]
+  }
+}
+```
+
+**Error Response:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "WORKSPACE_NOT_FOUND",
+    "message": "Workspace not initialized",
+    "recoverable": true,
+    "suggestion": "Run 's2s init <url>' to initialize a workspace"
+  }
+}
+```
+
+### Recommended AI Workflow
+
+**Step 1: Initialize and Crawl**
+```bash
+s2s init https://example.com
+s2s crawl --max-pages 50 --json
+```
+
+**Step 2: Analyze and Inspect Results**
+```bash
+s2s analyze --json
+# Parse the JSON to see detected page types and objects
+```
+
+**Step 3: Query Specific Data**
+```bash
+s2s list page-types --json   # Get detailed page type info
+s2s list objects --json      # Get detected reusable objects
+s2s status --json            # Check which phases are complete
+```
+
+**Step 4: Export with Decisions**
+```bash
+# Export only the types you want
+s2s export --types blog,product,landing --json
+
+# Or exclude types you don't want
+s2s export --exclude-types 404,search,error --json
+```
+
+### Error Codes for AI Agents
+
+| Code | Meaning | Recovery |
+|------|---------|----------|
+| `WORKSPACE_NOT_FOUND` | No workspace at path | Run `s2s init <url>` |
+| `NO_PAGES_FOUND` | Workspace exists but empty | Run `s2s crawl` |
+| `NO_MODEL_FOUND` | No schema model created | Run `s2s map` (interactive) |
+| `CRAWL_FAILED` | Crawl operation failed | Check URL and network |
+| `ANALYSIS_FAILED` | Analysis failed | Verify crawl data exists |
+| `EXPORT_FAILED` | Export failed | Check model.json exists |
+
+### Commands with JSON Support
+
+| Command | `--json` | Notes |
+|---------|----------|-------|
+| `s2s crawl` | ✅ | Returns crawl stats |
+| `s2s analyze` | ✅ | Returns page types, objects, relationships |
+| `s2s export` | ✅ | Returns exported file list |
+| `s2s status` | ✅ | Returns workspace phase status |
+| `s2s list <type>` | ✅ | Returns items of specified type |
+| `s2s start` | ❌ | Interactive only (use individual commands) |
+| `s2s map` | ❌ | Interactive only |
+
+### Tips for AI Agents
+
+1. **Always use `--json`** for parseable output
+2. **Check `s2s status --json`** to understand workspace state before running commands
+3. **Use `s2s list page-types --json`** to inspect detected types before exporting
+4. **Filter exports** with `--types` or `--exclude-types` to control what gets generated
+5. **Parse the `success` field** in JSON responses to determine if command succeeded
+6. **Check `error.suggestion`** for recovery hints when commands fail
+
+---
+
 ## Commands
 
 ### `start [url]` (Default)

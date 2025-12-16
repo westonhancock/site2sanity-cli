@@ -17,7 +17,7 @@ import {
 } from '../../utils/output';
 
 export const crawlCommand = new Command('crawl')
-  .description('Crawl the website and collect pages')
+  .description('Crawl the website and collect pages (supports --json for AI agents)')
   .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
   .option('--render', 'Use headless browser for JavaScript-heavy sites')
   .option('--screenshot <mode>', 'Capture screenshots: none, aboveFold, fullPage', 'none')
