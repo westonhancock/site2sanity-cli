@@ -15,6 +15,9 @@ export const crawlCommand = new Command('crawl')
   .option('--screenshot <mode>', 'Capture screenshots: none, aboveFold, fullPage', 'none')
   .option('--max-pages <number>', 'Override max pages from config')
   .option('--max-depth <number>', 'Override max depth from config')
+  .option('--exclude-paths <patterns>', 'Comma-separated URL path patterns to exclude (e.g., "/admin/*,/api/*")')
+  .option('--follow-subdomains', 'Follow links to subdomains')
+  .option('--allowed-subdomains <subdomains>', 'Comma-separated list of specific subdomains to follow (e.g., "blog,docs")')
   .option('--resume', 'Resume previous crawl')
   .action(async (options: any) => {
     try {
@@ -40,6 +43,26 @@ export const crawlCommand = new Command('crawl')
       }
       if (options.maxDepth) {
         config.crawl.maxDepth = parseInt(options.maxDepth);
+      }
+      if (options.excludePaths) {
+        const paths = options.excludePaths
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 0);
+        config.crawl.excludePaths = paths;
+        logger.info(`Excluding paths: ${paths.join(', ')}`);
+      }
+      if (options.followSubdomains) {
+        config.crawl.followSubdomains = true;
+      }
+      if (options.allowedSubdomains) {
+        config.crawl.followSubdomains = true; // Implicitly enable
+        const subdomains = options.allowedSubdomains
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter((s: string) => s.length > 0);
+        config.crawl.allowedSubdomains = subdomains;
+        logger.info(`Following subdomains: ${subdomains.join(', ')}`);
       }
 
       logger.section('Crawling Website');

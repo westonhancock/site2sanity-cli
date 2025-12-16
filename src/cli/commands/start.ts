@@ -103,6 +103,67 @@ export const startCommand = new Command('start')
       config.crawl.followSubdomains = crawlAnswers.followSubdomains;
       config.crawl.render = false; // Always use HTML crawl first (Phase 1)
 
+      // If following subdomains, ask which specific ones to follow
+      if (crawlAnswers.followSubdomains) {
+        const subdomainAnswers = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'allowedSubdomains',
+            message: 'Specific subdomains to follow (comma-separated, leave empty for all):',
+            default: '',
+            filter: (input: string) => input.trim(),
+          },
+        ]);
+
+        if (subdomainAnswers.allowedSubdomains) {
+          const subdomains = subdomainAnswers.allowedSubdomains
+            .split(',')
+            .map((s: string) => s.trim())
+            .filter((s: string) => s.length > 0);
+          config.crawl.allowedSubdomains = subdomains;
+
+          if (subdomains.length > 0) {
+            console.log(chalk.dim(`  Will only follow: ${subdomains.join(', ')}`));
+          }
+        } else {
+          config.crawl.allowedSubdomains = [];
+        }
+      }
+
+      // Ask about excluding URL paths
+      const excludePathsAnswer = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'wantExclude',
+          message: 'Exclude specific URL paths? (e.g., /admin/*, /api/*)',
+          default: false,
+        },
+      ]);
+
+      if (excludePathsAnswer.wantExclude) {
+        const pathPatternsAnswer = await inquirer.prompt([
+          {
+            type: 'input',
+            name: 'excludePaths',
+            message: 'URL path patterns to exclude (comma-separated, supports * and **):',
+            default: '/admin/*,/api/*',
+            filter: (input: string) => input.trim(),
+          },
+        ]);
+
+        if (pathPatternsAnswer.excludePaths) {
+          const paths = pathPatternsAnswer.excludePaths
+            .split(',')
+            .map((s: string) => s.trim())
+            .filter((s: string) => s.length > 0);
+          config.crawl.excludePaths = paths;
+
+          if (paths.length > 0) {
+            console.log(chalk.dim(`  Excluding paths: ${paths.join(', ')}`));
+          }
+        }
+      }
+
       // Step 3: Crawl
       console.log();
       logger.section('Crawling Website');

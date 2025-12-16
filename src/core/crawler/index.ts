@@ -6,7 +6,7 @@ import * as cheerio from 'cheerio';
 import fetch from 'node-fetch';
 import puppeteer, { Browser, Page as PuppeteerPage } from 'puppeteer';
 import { CrawlConfig, Page, PageMeta, Heading, Link } from '../../types';
-import { normalizeUrl, isSameOrigin, urlToId, generateContentHash, getUrlDepth } from '../../utils/url';
+import { normalizeUrl, isSameOrigin, urlToId, generateContentHash, getUrlDepth, matchesPathPattern, isAllowedSubdomain } from '../../utils/url';
 import { CrawlDatabase } from '../../utils/database';
 import PQueue from 'p-queue';
 import { logger } from '../../utils/logger';
@@ -176,6 +176,7 @@ export class Crawler {
         if (depth < this.config.maxDepth) {
           const newLinks = page.links
             .filter(link => isSameOrigin(link.href, this.baseUrl, this.config.followSubdomains))
+            .filter(link => isAllowedSubdomain(link.href, this.baseUrl, this.config.allowedSubdomains))
             .filter(link => !this.visited.has(normalizeUrl(link.href)))
             .filter(link => !this.queued.has(normalizeUrl(link.href)))
             .filter(link => !this.shouldExclude(normalizeUrl(link.href)));
@@ -428,12 +429,19 @@ export class Crawler {
    * Check if URL should be excluded
    */
   private shouldExclude(url: string): boolean {
-    // Check exclude patterns
+    // Check exclude patterns (simple string matching)
     if (this.config.exclude && this.config.exclude.length > 0) {
       for (const pattern of this.config.exclude) {
         if (url.includes(pattern)) {
           return true;
         }
+      }
+    }
+
+    // Check exclude path patterns (glob matching)
+    if (this.config.excludePaths && this.config.excludePaths.length > 0) {
+      if (matchesPathPattern(url, this.config.excludePaths)) {
+        return true;
       }
     }
 

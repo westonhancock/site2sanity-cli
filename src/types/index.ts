@@ -17,7 +17,9 @@ export interface CrawlConfig {
   maxDepth: number;
   include?: string[];
   exclude?: string[];
+  excludePaths?: string[]; // Glob patterns for URL paths to exclude (e.g., '/admin/*', '/api/*')
   followSubdomains: boolean;
+  allowedSubdomains?: string[]; // Specific subdomains to follow when followSubdomains is true (empty = all)
   render: boolean;
   screenshot: 'none' | 'aboveFold' | 'fullPage';
   screenshotSamplesPerType: number; // Number of representative screenshots per page type

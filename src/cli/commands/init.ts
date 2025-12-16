@@ -13,6 +13,9 @@ export const initCommand = new Command('init')
   .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
   .option('--max-pages <number>', 'Maximum pages to crawl', '1000')
   .option('--max-depth <number>', 'Maximum crawl depth', '10')
+  .option('--exclude-paths <patterns>', 'Comma-separated URL path patterns to exclude (e.g., "/admin/*,/api/*")')
+  .option('--follow-subdomains', 'Follow links to subdomains')
+  .option('--allowed-subdomains <subdomains>', 'Comma-separated list of specific subdomains to follow (e.g., "blog,docs")')
   .action(async (url: string, options: any) => {
     try {
       logger.section('Initializing site2sanity project');
@@ -38,12 +41,25 @@ export const initCommand = new Command('init')
         process.exit(1);
       }
 
+      // Parse exclude paths if provided
+      const excludePaths = options.excludePaths
+        ? options.excludePaths.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+        : [];
+
+      // Parse allowed subdomains if provided
+      const allowedSubdomains = options.allowedSubdomains
+        ? options.allowedSubdomains.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+        : [];
+
       await workspace.init(baseUrl, {
         crawl: {
           maxPages: parseInt(options.maxPages),
           maxDepth: parseInt(options.maxDepth),
           include: [],
           exclude: [],
+          excludePaths,
+          followSubdomains: options.followSubdomains || allowedSubdomains.length > 0,
+          allowedSubdomains,
           render: false,
           screenshot: 'none',
           throttle: 100,
@@ -51,6 +67,13 @@ export const initCommand = new Command('init')
           respectRobots: true,
         },
       } as any);
+
+      if (excludePaths.length > 0) {
+        logger.info(`Excluding paths: ${excludePaths.join(', ')}`);
+      }
+      if (allowedSubdomains.length > 0) {
+        logger.info(`Following subdomains: ${allowedSubdomains.join(', ')}`);
+      }
 
       logger.succeedSpinner('Workspace created');
 
