@@ -100,8 +100,11 @@ export class ObjectDetector {
       }
     }
 
+    // Filter out invalid/empty instances before validation
+    const filteredInstances = this.filterValidInstances(allAuthorInstances);
+
     // Validate instances using AI if available
-    const validatedInstances = await this.validateInstances(allAuthorInstances, 'author');
+    const validatedInstances = await this.validateInstances(filteredInstances, 'author');
 
     // Create a single generic 'author' type if we found at least 2 valid instances
     if (validatedInstances.length >= 2) {
@@ -186,8 +189,11 @@ export class ObjectDetector {
       }
     }
 
+    // Filter out invalid/empty instances before validation
+    const filteredInstances = this.filterValidInstances(allCategoryInstances);
+
     // Validate instances using AI if available
-    const validatedInstances = await this.validateInstances(allCategoryInstances, 'category');
+    const validatedInstances = await this.validateInstances(filteredInstances, 'category');
 
     // Create a single generic 'category' type if we found at least 2 valid instances
     if (validatedInstances.length >= 2) {
@@ -257,8 +263,11 @@ export class ObjectDetector {
       }
     }
 
+    // Filter out invalid/empty instances before validation
+    const filteredInstances = this.filterValidInstances(allTagInstances);
+
     // Validate instances using AI if available
-    const validatedInstances = await this.validateInstances(allTagInstances, 'tag');
+    const validatedInstances = await this.validateInstances(filteredInstances, 'tag');
 
     // Create a single generic 'tag' type if we found at least 2 valid instances
     if (validatedInstances.length >= 2) {
@@ -306,8 +315,11 @@ export class ObjectDetector {
       }
     }
 
+    // Filter out invalid/empty instances before validation
+    const filteredInstances = this.filterValidInstances(allLocationInstances);
+
     // Validate instances using AI if available
-    const validatedInstances = await this.validateInstances(allLocationInstances, 'location');
+    const validatedInstances = await this.validateInstances(filteredInstances, 'location');
 
     // Create a single generic 'location' type if we found at least 2 valid instances
     if (validatedInstances.length >= 2) {
@@ -354,8 +366,11 @@ export class ObjectDetector {
       }
     }
 
+    // Filter out invalid/empty instances before validation
+    const filteredInstances = this.filterValidInstances(allEventInstances);
+
     // Validate instances using AI if available
-    const validatedInstances = await this.validateInstances(allEventInstances, 'event');
+    const validatedInstances = await this.validateInstances(filteredInstances, 'event');
 
     // Create a single generic 'event' type if we found at least 2 valid instances
     if (validatedInstances.length >= 2) {
@@ -402,8 +417,11 @@ export class ObjectDetector {
       }
     }
 
+    // Filter out invalid/empty instances before validation
+    const filteredInstances = this.filterValidInstances(allProductInstances);
+
     // Validate instances using AI if available
-    const validatedInstances = await this.validateInstances(allProductInstances, 'product');
+    const validatedInstances = await this.validateInstances(filteredInstances, 'product');
 
     // Create a single generic 'product' type if we found at least 2 valid instances
     if (validatedInstances.length >= 2) {
@@ -502,7 +520,18 @@ export class ObjectDetector {
 
             if (itemType === 'object' && typeof firstItem === 'object' && firstItem !== null) {
               // Array of objects - infer nested structure
-              const allItems = arrayInstances.flatMap(arr => arr);
+              // PROTECTION: Limit total items to prevent memory issues with large arrays
+              const MAX_ARRAY_ITEMS = 1000;
+              let allItems: any[] = [];
+
+              for (const arr of arrayInstances) {
+                allItems.push(...arr);
+                if (allItems.length >= MAX_ARRAY_ITEMS) {
+                  allItems = allItems.slice(0, MAX_ARRAY_ITEMS);
+                  break;
+                }
+              }
+
               const itemInstances = allItems
                 .filter(item => item && typeof item === 'object')
                 .map(item => ({ pageUrl: '', data: item, source: 'content' as const }));
@@ -678,16 +707,22 @@ export class ObjectDetector {
     // Factor 2: Field structure consistency (weight: 0.30)
     const fieldSets = instances.map(i => new Set(Object.keys(i.data)));
 
-    // Calculate Jaccard similarity between each pair of instances
+    // OPTIMIZATION: Sample instances if too many to avoid O(n²) performance issues
+    const MAX_INSTANCES_FOR_COMPARISON = 100;
+    const samplesToCompare = fieldSets.length > MAX_INSTANCES_FOR_COMPARISON
+      ? this.randomSample(fieldSets, MAX_INSTANCES_FOR_COMPARISON)
+      : fieldSets;
+
+    // Calculate Jaccard similarity between each pair of sampled instances
     let totalSimilarity = 0;
     let comparisons = 0;
 
-    for (let i = 0; i < fieldSets.length; i++) {
-      for (let j = i + 1; j < fieldSets.length; j++) {
+    for (let i = 0; i < samplesToCompare.length; i++) {
+      for (let j = i + 1; j < samplesToCompare.length; j++) {
         const intersection = new Set(
-          Array.from(fieldSets[i]).filter(x => fieldSets[j].has(x))
+          Array.from(samplesToCompare[i]).filter(x => samplesToCompare[j].has(x))
         );
-        const union = new Set([...fieldSets[i], ...fieldSets[j]]);
+        const union = new Set([...samplesToCompare[i], ...samplesToCompare[j]]);
         totalSimilarity += intersection.size / union.size;
         comparisons++;
       }
@@ -750,6 +785,49 @@ export class ObjectDetector {
     }
 
     return totalFields > 0 ? consistentFields / totalFields : 1.0;
+  }
+
+  /**
+   * Filter out invalid/empty instances
+   * Removes instances with no data or all null/undefined values
+   */
+  private filterValidInstances(instances: ContentObjectInstance[]): ContentObjectInstance[] {
+    return instances.filter(instance => {
+      // Must have data object
+      if (!instance.data || typeof instance.data !== 'object') return false;
+
+      // Must have at least one field
+      const keys = Object.keys(instance.data);
+      if (keys.length === 0) return false;
+
+      // Must have at least one non-null, non-undefined value
+      const hasValue = keys.some(key =>
+        instance.data[key] !== null && instance.data[key] !== undefined
+      );
+
+      return hasValue;
+    });
+  }
+
+  /**
+   * Random sample from array
+   * Used to limit expensive operations on large datasets
+   */
+  private randomSample<T>(array: T[], count: number): T[] {
+    if (array.length <= count) return array;
+
+    const result: T[] = [];
+    const indices = new Set<number>();
+
+    while (indices.size < count) {
+      indices.add(Math.floor(Math.random() * array.length));
+    }
+
+    for (const index of indices) {
+      result.push(array[index]);
+    }
+
+    return result;
   }
 
   /**
