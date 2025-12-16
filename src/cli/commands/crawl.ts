@@ -1,5 +1,7 @@
 /**
  * Crawl command - Crawl the website
+ *
+ * Supports --json flag for AI-agent friendly output
  */
 
 import { Command } from 'commander';
@@ -7,6 +9,12 @@ import { Workspace } from '../../utils/workspace';
 import { CrawlDatabase } from '../../utils/database';
 import { Crawler } from '../../core/crawler';
 import { logger } from '../../utils/logger';
+import {
+  createOutput,
+  ErrorCode,
+  ErrorResponses,
+  CrawlResponseData,
+} from '../../utils/output';
 
 export const crawlCommand = new Command('crawl')
   .description('Crawl the website and collect pages')
@@ -16,11 +24,23 @@ export const crawlCommand = new Command('crawl')
   .option('--max-pages <number>', 'Override max pages from config')
   .option('--max-depth <number>', 'Override max depth from config')
   .option('--resume', 'Resume previous crawl')
+  .option('--json', 'Output results as JSON (for AI agents)')
   .action(async (options: any) => {
+    const output = createOutput(options);
+    const startTime = Date.now();
+
     try {
       const workspace = new Workspace(options.dir);
 
       if (!workspace.exists()) {
+        if (output.isJsonMode()) {
+          output.error(
+            ErrorCode.WORKSPACE_NOT_FOUND,
+            'Workspace not initialized',
+            ErrorResponses.workspaceNotFound(options.dir)
+          );
+          process.exit(1);
+        }
         logger.error('Workspace not initialized. Run "s2s init <url>" first.');
         process.exit(1);
       }
@@ -42,28 +62,33 @@ export const crawlCommand = new Command('crawl')
         config.crawl.maxDepth = parseInt(options.maxDepth);
       }
 
-      logger.section('Crawling Website');
+      if (!output.isJsonMode()) {
+        logger.section('Crawling Website');
+      }
 
       // Initialize database
       const db = new CrawlDatabase(workspace.getPath());
 
       if (!options.resume) {
-        logger.info('Starting fresh crawl (clearing previous data)');
+        if (!output.isJsonMode()) {
+          logger.info('Starting fresh crawl (clearing previous data)');
+        }
         db.clear();
       } else {
         const existingPages = db.getPageCount();
-        if (existingPages > 0) {
+        if (existingPages > 0 && !output.isJsonMode()) {
           logger.info(`Resuming crawl (${existingPages} pages already crawled)`);
         }
       }
 
       // Create run directory
       const runDir = workspace.createRun();
-      logger.info(`Run directory: ${runDir}`);
+      if (!output.isJsonMode()) {
+        logger.info(`Run directory: ${runDir}`);
+        logger.startSpinner('Crawling...');
+      }
 
       // Start crawler
-      logger.startSpinner('Crawling...');
-
       const crawler = new Crawler(config.baseUrl, config.crawl, db);
       await crawler.crawl();
 
@@ -73,23 +98,50 @@ export const crawlCommand = new Command('crawl')
 
       const pageCount = db.getPageCount();
       const successfulPages = db.getPagesByStatus(200).length;
-
-      logger.section('Crawl Summary');
-      logger.info(`Total pages: ${pageCount}`);
-      logger.info(`Successful (200): ${successfulPages}`);
-      logger.info(`Errors: ${pageCount - successfulPages}`);
-
-      logger.success('Crawl completed!');
-      console.log();
-      logger.info('Next steps:');
-      console.log('  1. Run "s2s analyze" to analyze the crawl data');
-      console.log('  2. Run "s2s report" to view crawl statistics');
+      const duration = Date.now() - startTime;
 
       db.close();
+
+      // Output results
+      if (output.isJsonMode()) {
+        const responseData: CrawlResponseData = {
+          workspace: workspace.getPath(),
+          baseUrl: config.baseUrl,
+          stats: {
+            totalPages: pageCount,
+            successfulPages: successfulPages,
+            errorPages: pageCount - successfulPages,
+            duration,
+          },
+        };
+        output.success(responseData);
+      } else {
+        logger.succeedSpinner('Crawl completed!');
+        logger.section('Crawl Summary');
+        logger.info(`Total pages: ${pageCount}`);
+        logger.info(`Successful (200): ${successfulPages}`);
+        logger.info(`Errors: ${pageCount - successfulPages}`);
+
+        logger.success('Crawl completed!');
+        console.log();
+        logger.info('Next steps:');
+        console.log('  1. Run "s2s analyze" to analyze the crawl data');
+        console.log('  2. Run "s2s report" to view crawl statistics');
+      }
     } catch (error) {
-      logger.error(`Crawl failed: ${(error as Error).message}`);
-      if (process.env.DEBUG) {
-        console.error(error);
+      const errorMessage = (error as Error).message;
+
+      if (output.isJsonMode()) {
+        output.error(ErrorCode.CRAWL_FAILED, 'Crawl failed', {
+          details: errorMessage,
+          recoverable: true,
+          suggestion: 'Check network connectivity and URL validity',
+        });
+      } else {
+        logger.error(`Crawl failed: ${errorMessage}`);
+        if (process.env.DEBUG) {
+          console.error(error);
+        }
       }
       process.exit(1);
     }
