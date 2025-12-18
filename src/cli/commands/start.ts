@@ -77,9 +77,8 @@ export const startCommand = new Command('start')
       console.log();
       logger.section('Crawl Configuration');
 
-      // Use high defaults for full site migration (maxPages: 1000, maxDepth: 10)
-      // Users can override via CLI flags if needed
-      logger.info(`Will crawl up to ${config.crawl.maxPages} pages at depth ${config.crawl.maxDepth}`);
+      // Default to unlimited crawling for full site migration (can override via CLI flags)
+      logger.info('Will crawl entire site (unlimited pages and depth)');
 
       const crawlAnswers = await inquirer.prompt([
         {

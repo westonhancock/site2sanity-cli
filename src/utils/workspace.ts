@@ -45,8 +45,8 @@ export class Workspace {
       baseUrl,
       workspaceDir: this.workspaceDir,
       crawl: {
-        maxPages: 1000,
-        maxDepth: 10,
+        maxPages: 1000000, // Effectively unlimited for migration use case
+        maxDepth: 100, // Effectively unlimited depth
         include: [],
         exclude: [],
         excludePaths: [], // Glob patterns for paths to exclude (e.g., '/admin/*', '/api/*')
