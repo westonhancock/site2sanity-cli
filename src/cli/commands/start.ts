@@ -77,19 +77,11 @@ export const startCommand = new Command('start')
       console.log();
       logger.section('Crawl Configuration');
 
+      // Use high defaults for full site migration (maxPages: 1000, maxDepth: 10)
+      // Users can override via CLI flags if needed
+      logger.info(`Will crawl up to ${config.crawl.maxPages} pages at depth ${config.crawl.maxDepth}`);
+
       const crawlAnswers = await inquirer.prompt([
-        {
-          type: 'number',
-          name: 'maxPages',
-          message: 'Maximum pages to crawl:',
-          default: 50,
-        },
-        {
-          type: 'number',
-          name: 'maxDepth',
-          message: 'Maximum crawl depth:',
-          default: 3,
-        },
         {
           type: 'confirm',
           name: 'followSubdomains',
@@ -98,8 +90,6 @@ export const startCommand = new Command('start')
         },
       ]);
 
-      config.crawl.maxPages = crawlAnswers.maxPages;
-      config.crawl.maxDepth = crawlAnswers.maxDepth;
       config.crawl.followSubdomains = crawlAnswers.followSubdomains;
       config.crawl.render = false; // Always use HTML crawl first (Phase 1)
 
