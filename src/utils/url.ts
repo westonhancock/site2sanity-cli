@@ -396,3 +396,39 @@ export function isAllowedSubdomain(url: string, baseUrl: string, allowedSubdomai
 
   return false;
 }
+
+/**
+ * Convert URL to safe directory name for workspace organization
+ * Examples:
+ * - https://example.com → example-com
+ * - https://blog.example.com → blog-example-com
+ * - https://example.com:8080 → example-com-8080
+ * - http://localhost:3000 → localhost-3000
+ */
+export function urlToDirName(url: string): string {
+  try {
+    const parsed = new URLParse(normalizeUrl(url));
+
+    // Start with hostname, replace dots with dashes
+    let dirName = parsed.hostname.replace(/\./g, '-');
+
+    // Add port if non-standard
+    if (parsed.port && parsed.port !== '80' && parsed.port !== '443') {
+      dirName += `-${parsed.port}`;
+    }
+
+    // Convert to lowercase for consistency
+    dirName = dirName.toLowerCase();
+
+    // Remove any characters that aren't alphanumeric or dash
+    dirName = dirName.replace(/[^a-z0-9-]/g, '');
+
+    // Remove leading/trailing dashes
+    dirName = dirName.replace(/^-+|-+$/g, '');
+
+    return dirName || 'site';
+  } catch {
+    // Fallback for invalid URLs
+    return 'site';
+  }
+}

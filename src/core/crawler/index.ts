@@ -3,6 +3,8 @@
  */
 
 import * as cheerio from 'cheerio';
+import * as fs from 'fs';
+import * as path from 'path';
 import fetch from 'node-fetch';
 import puppeteer, { Browser, Page as PuppeteerPage } from 'puppeteer';
 import { CrawlConfig, Page, PageMeta, Heading, Link } from '../../types';
@@ -20,11 +22,21 @@ export class Crawler {
   private queued: Set<string>; // Track URLs already in queue to prevent duplicates
   private toVisit: Array<{ url: string; depth: number }>;
   private browser: Browser | null = null;
+  private screenshotDir: string | null = null;
+  private workspaceDir: string | null = null;
 
-  constructor(baseUrl: string, config: CrawlConfig, db: CrawlDatabase) {
+  constructor(
+    baseUrl: string,
+    config: CrawlConfig,
+    db: CrawlDatabase,
+    screenshotDir?: string,
+    workspaceDir?: string
+  ) {
     this.baseUrl = normalizeUrl(baseUrl);
     this.config = config;
     this.db = db;
+    this.screenshotDir = screenshotDir || null;
+    this.workspaceDir = workspaceDir || null;
     this.queue = new PQueue({ concurrency: config.concurrency });
     this.visited = new Set();
     this.queued = new Set(); // Initialize queued URL tracker
@@ -290,13 +302,30 @@ export class Crawler {
 
       // Screenshot if configured or forced
       if (forceFullPage || this.config.screenshot !== 'none') {
-        const screenshotPath = `screenshot-${urlToId(url)}.png`;
-        const takeFullPage = forceFullPage || this.config.screenshot === 'fullPage';
-        await page.screenshot({
-          path: screenshotPath,
-          fullPage: takeFullPage,
-        });
-        pageData.screenshot = screenshotPath;
+        if (this.screenshotDir) {
+          // Ensure screenshot directory exists
+          if (!fs.existsSync(this.screenshotDir)) {
+            fs.mkdirSync(this.screenshotDir, { recursive: true });
+          }
+
+          const screenshotFilename = `screenshot-${urlToId(url)}.png`;
+          const screenshotPath = path.join(this.screenshotDir, screenshotFilename);
+          const takeFullPage = forceFullPage || this.config.screenshot === 'fullPage';
+
+          await page.screenshot({
+            path: screenshotPath,
+            fullPage: takeFullPage,
+          });
+
+          // Store workspace-relative path for portability
+          if (this.workspaceDir) {
+            pageData.screenshot = path.relative(this.workspaceDir, screenshotPath);
+          } else {
+            pageData.screenshot = screenshotPath;
+          }
+        } else {
+          logger.warn('Screenshot directory not configured, skipping screenshot');
+        }
       }
 
       return pageData;

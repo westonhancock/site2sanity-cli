@@ -12,7 +12,7 @@ import * as path from 'path';
 
 export const reportCommand = new Command('report')
   .description('Generate a comprehensive analysis report')
-  .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
+  .option('-d, --dir <directory>', 'Global workspace directory', '~/.s2s')
   .option('-f, --format <format>', 'Output format: md or json', 'md')
   .option('-o, --output <file>', 'Output file path')
   .action(async (options: any) => {

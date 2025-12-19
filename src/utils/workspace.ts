@@ -4,24 +4,56 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { Config } from '../types';
+import { urlToDirName } from './url';
 
 export class Workspace {
-  private workspaceDir: string;
+  private globalWorkspace: string;
+  private urlDir: string | null = null;
 
-  constructor(workspaceDir: string = '.site2sanity') {
-    this.workspaceDir = workspaceDir;
+  constructor(globalWorkspace: string = '~/.s2s') {
+    // Expand home directory if needed
+    if (globalWorkspace.startsWith('~/')) {
+      this.globalWorkspace = path.join(os.homedir(), globalWorkspace.slice(2));
+    } else if (globalWorkspace === '~') {
+      this.globalWorkspace = path.join(os.homedir(), '.s2s');
+    } else {
+      this.globalWorkspace = globalWorkspace;
+    }
+  }
+
+  /**
+   * Set URL for this workspace (creates URL-based subdirectory)
+   */
+  setUrl(url: string): void {
+    this.urlDir = urlToDirName(url);
+  }
+
+  /**
+   * Get the workspace directory (global or URL-specific)
+   */
+  private get workspaceDir(): string {
+    if (this.urlDir) {
+      return path.join(this.globalWorkspace, this.urlDir);
+    }
+    return this.globalWorkspace;
   }
 
   /**
    * Initialize workspace structure
    */
   async init(baseUrl: string, config?: Partial<Config>): Promise<void> {
+    // Set URL-based directory if not already set
+    if (!this.urlDir) {
+      this.setUrl(baseUrl);
+    }
+
     const dirs = [
       this.workspaceDir,
       path.join(this.workspaceDir, 'runs'),
-      path.join(this.workspaceDir, 'artifacts'),
       path.join(this.workspaceDir, 'data'),
+      path.join(this.workspaceDir, 'sanity'),
     ];
 
     for (const dir of dirs) {
@@ -72,7 +104,7 @@ export class Workspace {
         portableTextConfig: 'standard',
       },
       export: {
-        outDir: 'out',
+        outDir: path.join(this.workspaceDir, 'sanity'),
         includeStructure: true,
         typescriptStyle: 'defineType',
       },
@@ -140,6 +172,20 @@ export class Workspace {
    */
   exists(): boolean {
     return fs.existsSync(path.join(this.workspaceDir, 'config.json'));
+  }
+
+  /**
+   * Check if a crawl exists for a given URL
+   */
+  checkExistingCrawl(url: string): { exists: boolean; path: string } {
+    const urlDir = urlToDirName(url);
+    const urlWorkspace = path.join(this.globalWorkspace, urlDir);
+    const exists = fs.existsSync(path.join(urlWorkspace, 'config.json'));
+
+    return {
+      exists,
+      path: urlWorkspace,
+    };
   }
 
   /**

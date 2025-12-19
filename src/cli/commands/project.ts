@@ -16,7 +16,7 @@ import * as fs from 'fs/promises';
 export const projectCommand = new Command('project')
   .description('Open and edit an existing workspace')
   .argument('[name]', 'Project name (optional - will show list if not provided)')
-  .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
+  .option('-d, --dir <directory>', 'Global workspace directory', '~/.s2s')
   .action(async (name: string | undefined, options: any) => {
     try {
       const workspace = new Workspace(options.dir);

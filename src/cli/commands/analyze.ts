@@ -18,7 +18,7 @@ import {
 
 export const analyzeCommand = new Command('analyze')
   .description('Analyze crawl data to detect page types, objects, and relationships (supports --json for AI agents)')
-  .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
+  .option('-d, --dir <directory>', 'Global workspace directory', '~/.s2s')
   .option('--json', 'Output results as JSON (for AI agents)')
   .action(async (options: any) => {
     const output = createOutput(options);

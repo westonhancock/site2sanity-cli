@@ -9,7 +9,7 @@ import { SanityModel, LintResult, LintIssue } from '../../types';
 
 export const lintCommand = new Command('lint')
   .description('Validate Sanity schema for correctness and best practices')
-  .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
+  .option('-d, --dir <directory>', 'Global workspace directory', '~/.s2s')
   .action(async (options: any) => {
     try {
       const workspace = new Workspace(options.dir);

@@ -20,7 +20,7 @@ import chalk from 'chalk';
 export const startCommand = new Command('start')
   .description('Interactive workflow: two-phase crawl (HTML + screenshots), AI-powered analysis with vision, schema generation, and optional Sanity Studio setup')
   .argument('[url]', 'Base URL of the site to analyze (optional - will prompt if not provided)')
-  .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
+  .option('-d, --dir <directory>', 'Global workspace directory', '~/.s2s')
   .option('--no-ai', 'Skip AI-powered analysis with vision (blocks, objects, enhanced fields)')
   .action(async (url: string | undefined, options: any) => {
     try {
@@ -51,23 +51,34 @@ export const startCommand = new Command('start')
 
       // Initialize workspace
       const workspace = new Workspace(options.dir);
+      workspace.setUrl(baseUrl);
 
+      // Check if crawl exists for this URL
       if (workspace.exists()) {
         const overwrite = await inquirer.prompt([
           {
-            type: 'confirm',
-            name: 'overwrite',
-            message: 'A workspace already exists. Start fresh?',
-            default: false,
+            type: 'list',
+            name: 'action',
+            message: `A crawl already exists for ${baseUrl}. What would you like to do?`,
+            choices: [
+              { name: 'Continue with existing data', value: 'continue' },
+              { name: 'Start fresh (clear all data)', value: 'fresh' },
+              { name: 'Cancel', value: 'cancel' },
+            ],
           },
         ]);
 
-        if (!overwrite.overwrite) {
-          logger.info('Using existing workspace');
-        } else {
+        if (overwrite.action === 'cancel') {
+          logger.info('Cancelled');
+          process.exit(0);
+        } else if (overwrite.action === 'fresh') {
+          logger.info('Starting fresh...');
           await workspace.init(baseUrl);
+        } else {
+          logger.info('Using existing workspace');
         }
       } else {
+        logger.info('Initializing new workspace...');
         await workspace.init(baseUrl);
       }
 
@@ -161,9 +172,17 @@ export const startCommand = new Command('start')
       db.clear();
 
       const runDir = workspace.createRun();
+      const screenshotDir = path.join(runDir, 'screenshots');
+
       logger.startSpinner(`Crawling ${baseUrl}...`);
 
-      const crawler = new Crawler(config.baseUrl, config.crawl, db);
+      const crawler = new Crawler(
+        config.baseUrl,
+        config.crawl,
+        db,
+        screenshotDir,
+        workspace.getPath()
+      );
       await crawler.crawl();
 
       const pageCount = db.getPageCount();

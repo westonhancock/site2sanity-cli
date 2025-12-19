@@ -10,7 +10,7 @@ import * as path from 'path';
 
 export const doctorCommand = new Command('doctor')
   .description('Diagnose workspace and environment issues')
-  .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
+  .option('-d, --dir <directory>', 'Global workspace directory', '~/.s2s')
   .action(async (options: any) => {
     logger.section('Running Diagnostics');
 

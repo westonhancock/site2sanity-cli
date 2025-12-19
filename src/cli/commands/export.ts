@@ -6,6 +6,7 @@
  */
 
 import { Command } from 'commander';
+import { normalizeUrl } from '../../utils/url';
 import { Workspace } from '../../utils/workspace';
 import { logger } from '../../utils/logger';
 import { SanityModel, MappingSpec } from '../../types';
@@ -21,27 +22,40 @@ import * as fs from 'fs';
 
 export const exportCommand = new Command('export')
   .description('Export Sanity schema files (supports --json, --types, --exclude-types for AI agents)')
-  .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
-  .option('-o, --out <directory>', 'Output directory', 'out')
+  .argument('[url]', 'Base URL of the site (optional if workspace has config)')
+  .option('-d, --dir <directory>', 'Global workspace directory', '~/.s2s')
+  .option('-o, --out <directory>', 'Output directory (defaults to workspace/sanity)')
   .option('--types <types>', 'Comma-separated list of document types to include')
   .option('--exclude-types <types>', 'Comma-separated list of document types to exclude')
   .option('--json', 'Output results as JSON (for AI agents)')
-  .action(async (options: any) => {
+  .action(async (url: string | undefined, options: any) => {
     const output = createOutput(options);
 
     try {
       const workspace = new Workspace(options.dir);
+
+      // Handle URL parameter
+      if (url) {
+        const baseUrl = normalizeUrl(url);
+        workspace.setUrl(baseUrl);
+      } else {
+        // Try to load config to get URL
+        if (workspace.exists()) {
+          const config = await workspace.loadConfig();
+          workspace.setUrl(config.baseUrl);
+        }
+      }
 
       if (!workspace.exists()) {
         if (output.isJsonMode()) {
           output.error(
             ErrorCode.WORKSPACE_NOT_FOUND,
             'Workspace not initialized',
-            ErrorResponses.workspaceNotFound(options.dir)
+            ErrorResponses.workspaceNotFound(workspace.getPath())
           );
           process.exit(1);
         }
-        logger.error('Workspace not initialized. Run "s2s init <url>" first.');
+        logger.error('Workspace not initialized. Run "s2s init <url>" first or specify a URL.');
         process.exit(1);
       }
 

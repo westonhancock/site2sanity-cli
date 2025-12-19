@@ -5,6 +5,8 @@
  */
 
 import { Command } from 'commander';
+import * as path from 'path';
+import { normalizeUrl } from '../../utils/url';
 import { Workspace } from '../../utils/workspace';
 import { CrawlDatabase } from '../../utils/database';
 import { Crawler } from '../../core/crawler';
@@ -18,7 +20,8 @@ import {
 
 export const crawlCommand = new Command('crawl')
   .description('Crawl the website and collect pages (supports --json for AI agents)')
-  .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
+  .argument('[url]', 'Base URL of the site (optional if workspace has config)')
+  .option('-d, --dir <directory>', 'Global workspace directory', '~/.s2s')
   .option('--render', 'Use headless browser for JavaScript-heavy sites')
   .option('--screenshot <mode>', 'Capture screenshots: none, aboveFold, fullPage', 'none')
   .option('--max-pages <number>', 'Override max pages from config')
@@ -28,28 +31,53 @@ export const crawlCommand = new Command('crawl')
   .option('--allowed-subdomains <subdomains>', 'Comma-separated list of specific subdomains to follow (e.g., "blog,docs")')
   .option('--resume', 'Resume previous crawl')
   .option('--json', 'Output results as JSON (for AI agents)')
-  .action(async (options: any) => {
+  .action(async (url: string | undefined, options: any) => {
     const output = createOutput(options);
     const startTime = Date.now();
 
     try {
       const workspace = new Workspace(options.dir);
 
-      if (!workspace.exists()) {
-        if (output.isJsonMode()) {
-          output.error(
-            ErrorCode.WORKSPACE_NOT_FOUND,
-            'Workspace not initialized',
-            ErrorResponses.workspaceNotFound(options.dir)
-          );
+      // If URL provided, use it to set workspace directory
+      if (url) {
+        const baseUrl = normalizeUrl(url);
+        workspace.setUrl(baseUrl);
+
+        if (!workspace.exists()) {
+          if (output.isJsonMode()) {
+            output.error(
+              ErrorCode.WORKSPACE_NOT_FOUND,
+              'Workspace not initialized',
+              ErrorResponses.workspaceNotFound(workspace.getPath())
+            );
+            process.exit(1);
+          }
+          logger.error(`Workspace not initialized for ${baseUrl}. Run "s2s init ${baseUrl}" first.`);
           process.exit(1);
         }
-        logger.error('Workspace not initialized. Run "s2s init <url>" first.');
-        process.exit(1);
+      } else {
+        // No URL provided - check if workspace exists and load URL from config
+        if (!workspace.exists()) {
+          if (output.isJsonMode()) {
+            output.error(
+              ErrorCode.WORKSPACE_NOT_FOUND,
+              'Workspace not initialized',
+              ErrorResponses.workspaceNotFound(options.dir)
+            );
+            process.exit(1);
+          }
+          logger.error('No URL provided and no workspace found. Run "s2s init <url>" first or specify a URL.');
+          process.exit(1);
+        }
       }
 
       // Load config
       const config = await workspace.loadConfig();
+
+      // If URL wasn't provided, set it from config
+      if (!url) {
+        workspace.setUrl(config.baseUrl);
+      }
 
       // Override config with CLI options
       if (options.render !== undefined) {
@@ -106,13 +134,21 @@ export const crawlCommand = new Command('crawl')
 
       // Create run directory
       const runDir = workspace.createRun();
+      const screenshotDir = path.join(runDir, 'screenshots');
+
       if (!output.isJsonMode()) {
         logger.info(`Run directory: ${runDir}`);
         logger.startSpinner('Crawling...');
       }
 
       // Start crawler
-      const crawler = new Crawler(config.baseUrl, config.crawl, db);
+      const crawler = new Crawler(
+        config.baseUrl,
+        config.crawl,
+        db,
+        screenshotDir,
+        workspace.getPath()
+      );
       await crawler.crawl();
 
       // Save crawl metadata

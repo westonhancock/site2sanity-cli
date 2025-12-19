@@ -10,7 +10,7 @@ import { PageType, SanityModel } from '../../types';
 
 export const mapCommand = new Command('map')
   .description('Interactively map page types to Sanity schema')
-  .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
+  .option('-d, --dir <directory>', 'Global workspace directory', '~/.s2s')
   .option('--non-interactive', 'Run in non-interactive mode with defaults')
   .action(async (options: any) => {
     try {

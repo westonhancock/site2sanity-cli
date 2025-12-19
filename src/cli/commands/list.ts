@@ -22,7 +22,7 @@ import * as path from 'path';
 export const listCommand = new Command('list')
   .description('[AI] Query detected content: page-types, objects, blocks, or documents')
   .argument('<type>', 'page-types | objects | blocks | documents')
-  .option('-d, --dir <directory>', 'Workspace directory', '.site2sanity')
+  .option('-d, --dir <directory>', 'Global workspace directory', '~/.s2s')
   .option('--json', 'Output results as JSON (for AI agents)')
   .option('--verbose', 'Include full details for each item')
   .action(async (type: string, options: any) => {
